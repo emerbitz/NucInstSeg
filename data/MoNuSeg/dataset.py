@@ -77,15 +77,15 @@ class MoNuSeg(Dataset):
 
         if self.segmentation_mask:
             seg_mask_file = Path(self.seg_mask_dir, file + ".npy")
-            seg_mask = np.load(seg_mask_file)
+            seg_mask = np.load(str(seg_mask_file))
             output.append(seg_mask)
         if self.contour_mask:
             cont_mask_file = Path(self.cont_mask_dir, file + ".npy")
-            cont_mask = np.load(cont_mask_file)
+            cont_mask = np.load(str(cont_mask_file))
             output.append(cont_mask)
         if self.distance_map:
             dist_map_file = Path(self.dist_map_dir, file + ".npy")
-            dist_map = np.load(dist_map_file)
+            dist_map = np.load(str(dist_map_file))
             output.append(dist_map)
 
         if self.transforms is not None:

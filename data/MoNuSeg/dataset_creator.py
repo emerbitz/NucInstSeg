@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import NoReturn
 from tqdm import tqdm
 
-from utils import comp_dirs
-from ground_truth import NucleiInstances
+from data.MoNuSeg.utils import comp_dirs
+from data.MoNuSeg.ground_truth import NucleiInstances
 
 
 class MoNuSegCreator:
@@ -12,7 +12,7 @@ class MoNuSegCreator:
     Prepares the MoNuSeg dataset prior to usage
     """
 
-    def __init__(self, root: str = "data", ) -> NoReturn:
+    def __init__(self, root: str = "datasets", ) -> NoReturn:
         self.base_dir = Path(root, "MoNuSeg 2018 Training Data")
         # self.img_dir = Path(self.base_dir, "Tissue Images")
         self.label_dir = Path(self.base_dir, "Annotations")
@@ -65,7 +65,7 @@ class MoNuSegCreator:
         save_dir = Path(self.base_dir, truth_type)
         save_dir.mkdir(exist_ok=True)
         labels = comp_dirs(self.label_dir, save_dir)
-        print(f'Generating {truth_type} ...')
+        print(f'Generating: {truth_type}')
         pbar = tqdm(labels)
         for label in pbar:
             pbar.set_description(f"Processing {label.stem}")
@@ -81,4 +81,4 @@ class MoNuSegCreator:
                     "Parameter truth_type must be 'Segmentation masks', 'Contour masks' or 'Distance maps'. Got {"
                     "truth_type} instead.")
             save_path = Path(save_dir, label.stem + ".npy")
-            np.save(save_path, truth)
+            np.save(str(save_path), truth)
