@@ -41,7 +41,7 @@ class MoNuSeg(Dataset):
             "TCGA-KB-A93J-01A-01-TS1",  # Stomach
             "TCGA-RD-A8N9-01A-01-TS1"]  # Stomach
 
-    # Not part of the orginal MoNuSeg dataset:
+    # Not part of the original MoNuSeg dataset:
     surplus = ["TCGA-UZ-A9PN-01Z-00-DX1",
                "TCGA-F9-A8NY-01Z-00-DX1",
                "TCGA-MH-A561-01Z-00-DX1",
