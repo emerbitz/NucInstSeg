@@ -17,18 +17,18 @@ class MoNuSegCreator:
         # self.img_dir = Path(self.base_dir, "Tissue Images")
         self.label_dir = Path(self.base_dir, "Annotations")
 
-    def save_ground_truths(self, segmentation_mask: bool = True, contour_mask: bool = True,
-                           distance_map: bool = True) -> NoReturn:
+    def save_ground_truths(self, segmentation_masks: bool = True, contour_masks: bool = True,
+                           distance_maps: bool = True) -> NoReturn:
         """
         Generates and saves the ground truths of the specified types if the ground truths do not exist
         """
 
         print("##### Generating ground truths #####")
-        if segmentation_mask:
+        if segmentation_masks:
             self.save_truth_type("Segmentation masks")
-        if contour_mask:
+        if contour_masks:
             self.save_truth_type("Contour masks")
-        if distance_map:
+        if distance_maps:
             self.save_truth_type("Distance maps")
 
     @staticmethod
