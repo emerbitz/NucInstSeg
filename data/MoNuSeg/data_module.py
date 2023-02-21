@@ -11,11 +11,11 @@ class MoNuSegDataModule(pl.LightningDataModule):
     Performs splitting and batching into train, validation and test for the MoNuSeg dataset
     """
 
-    def __init__(self):
+    def __init__(self, seg_masks: bool = True, cont_masks: bool = True, dist_maps: bool = True):
         super().__init__()
-        self.seg_masks = True
-        self.cont_masks = True
-        self.dist_maps = True
+        self.seg_masks = seg_masks
+        self.cont_masks = cont_masks
+        self.dist_maps = dist_maps
         self.batch_size = 4
 
     def prepare_data(self) -> NoReturn:
