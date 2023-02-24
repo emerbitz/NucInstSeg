@@ -8,13 +8,13 @@ from skimage.segmentation import find_boundaries
 
 
 class NucleiInstances:
-    def __init__(self, nuclei_instances: List[np.array]) -> NoReturn:
+    def __init__(self, nuclei_instances: List[np.ndarray]) -> NoReturn:
         self.nuc_inst = nuclei_instances
 
     def __len__(self) -> int:
         return len(self.nuc_inst)
 
-    def __getitem__(self, idx) -> np.array:
+    def __getitem__(self, idx) -> np.ndarray:
         return self.nuc_inst[idx]
 
     @staticmethod
@@ -36,7 +36,7 @@ class NucleiInstances:
             nuc_inst.append(polygon2mask(image_shape=img_shape, polygon=polygon))
         return NucleiInstances(nuc_inst)
 
-    def to_seg_mask(self) -> np.array:
+    def to_seg_mask(self) -> np.ndarray:
         """
         Generates a binary mask from the nuclei instances
         """
@@ -45,9 +45,9 @@ class NucleiInstances:
         mask = np.zeros(shape=mask_shape, dtype=bool)
         for inst in self.nuc_inst:
             mask = np.logical_or(mask, inst)
-        return mask
+        return mask.astype(float)
 
-    def to_cont_mask(self) -> np.array:
+    def to_cont_mask(self) -> np.ndarray:
         """
         Generates a binary mask of the nuclei contours from the nuclei instances
         """
@@ -62,22 +62,22 @@ class NucleiInstances:
                 background=False
             )  # Connectivity=1: 4-connected neighborhood, Connectivity=2: 8-connected neighborhood
             mask = np.logical_or(mask, contours)
-        return mask
+        return mask.astype(float)
 
-    def to_dist_map(self) -> np.array:
+    def to_dist_map(self) -> np.ndarray:
         """
         Generates a distance map from the nuclei instances
         """
 
         mask = self.to_seg_mask()
-        map = np.zeros(mask.shape)
+        map = np.zeros(mask.shape, dtype=float)
         for y in range(map.shape[0]):
             for x in range(map.shape[1]):
                 map[y, x] = NucleiInstances.background_dist((y, x), mask)
         return map
 
     @staticmethod
-    def background_dist(pixel: tuple, mask: np.array) -> int:
+    def background_dist(pixel: tuple, mask: np.ndarray) -> int:
         """
         Calculates the chessboard distance of a pixel to the nearest background pixel
         """
