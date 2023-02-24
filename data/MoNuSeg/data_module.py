@@ -21,7 +21,7 @@ class MoNuSegDataModule(pl.LightningDataModule):
         self.cont_masks = cont_masks
         self.dist_maps = dist_maps
         self.root = data_root
-        self.batch_size = 12
+        self.batch_size = 4
         self.threads = torch.get_num_threads()
         self.train_transforms = Combine([
             ToTensor(),
@@ -55,7 +55,7 @@ class MoNuSegDataModule(pl.LightningDataModule):
                 transforms=self.train_transforms
             )
             # Problem?: Same Transformation for train and val split
-            self.train_data, self.val_data = random_split(data, lengths=[12,4])
+            self.train_data, self.val_data = random_split(data, lengths=[12, 4])
 
         if stage == "test" or stage is None:
             self.test_data = MoNuSeg(
@@ -68,7 +68,7 @@ class MoNuSegDataModule(pl.LightningDataModule):
             )
 
     def train_dataloader(self) -> DataLoader:
-        return DataLoader(self.train_data, batch_size=self.batch_size, shuffle=False, num_workers=self.threads)
+        return DataLoader(self.train_data, batch_size=self.batch_size, shuffle=True, num_workers=self.threads)
 
     def val_dataloader(self) -> DataLoader:
         return DataLoader(self.val_data, batch_size=self.batch_size, shuffle=False, num_workers=self.threads)
