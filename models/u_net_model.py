@@ -4,10 +4,11 @@ import torch
 
 
 class UNetModel(pl.LightningModule):
-    def __int__(self, model) -> NoReturn:
+    def __init__(self, model) -> NoReturn:
+        super(UNetModel, self).__init__()
         self.model = model
         self.lr = 2e-4
-        self.loss = torch.nn.BCELoss()
+        self.loss = torch.nn.BCEWithLogitsLoss()
 
     def forward(self, x) -> torch.Tensor:
         return self.model(x)
