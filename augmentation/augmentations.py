@@ -68,17 +68,30 @@ if __name__ == "__main__":
     import torchvision.transforms as T
     from data.MoNuSeg.dataset import MoNuSeg
     from data.MoNuSeg.illustrator import Picture
-    from transformation.transformation import ToTensor, Combine
+    from transformation.transformations import ToTensor, Combine
+    from data.MoNuSeg.data_module import MoNuSegDataModule
 
-    transforms = Combine([
-        ToTensor(),
-        RandHorizontalFlip(p=0.5),
-        RandCrop(size=(10, 10))
-    ])
+    # transforms = Combine([
+    #     ToTensor(),
+    #     RandHorizontalFlip(p=0.5),
+    #     RandCrop(size=(10, 10))
+    # ])
+    #
+    # train_data = MoNuSeg(root="../datasets", split="Train", transforms=transforms)
+    # for pair in train_data:
+    #     print(type(pair[0]))
+    #     pic = Picture.from_tensor(pair[0])
+    #     print(pic.size())
+    #     pic.show()
 
-    train_data = MoNuSeg(root="../datasets", split="Train", transforms=transforms)
-    for pair in train_data:
-        print(type(pair[0]))
-        pic = Picture.from_tensor(pair[0])
-        print(pic.size())
-        pic.show()
+    data_module = MoNuSegDataModule()
+    data_module.prepare_data()
+    data_module.setup(stage="fit")
+    dataloader = data_module.train_dataloader()
+    for batch in dataloader:
+        for elements in batch:
+            element = elements[0,:,:,:]
+            pic = Picture.from_tensor(element)
+            print(pic.size())
+            pic.show()
+

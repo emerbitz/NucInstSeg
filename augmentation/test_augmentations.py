@@ -2,7 +2,7 @@ import unittest
 from torchvision.transforms import functional as F
 
 from test_augmentation_base import AugmentationTest
-from augmentation import RandHorizontalFlip, RandVerticalFlip, RandRotate
+from augmentations import RandHorizontalFlip, RandVerticalFlip, RandRotate
 
 class TestRandHorizontalFlip(AugmentationTest, unittest.TestCase):
     def transform_img(self):
