@@ -5,6 +5,7 @@ import torch
 
 
 class Augmentation(ABC):
+    """Base class for image augmentations"""
 
     def __call__(self, imgs: List[torch.Tensor]) -> List[torch.Tensor]:
         seed = random.random()
