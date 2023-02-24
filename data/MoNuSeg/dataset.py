@@ -51,7 +51,7 @@ class MoNuSeg(Dataset):
                "TCGA-BC-A217-01Z-00-DX1"]
 
     def __init__(self, root: str = "datasets", segmentation_mask: bool = True, contour_mask: bool = True,
-                 distance_map: bool = True, transforms=T.ToTensor(), split: str = "Whole") -> NoReturn:
+                 distance_map: bool = True, transforms=None, split: str = "Whole") -> NoReturn:
         self.segmentation_mask = segmentation_mask
         self.contour_mask = contour_mask
         self.distance_map = distance_map
@@ -89,8 +89,7 @@ class MoNuSeg(Dataset):
             output.append(dist_map)
 
         if self.transforms is not None:
-            for element_idx, element in enumerate(output):
-                output[element_idx] = self.transforms(element)
+            output = self.transforms(output)
 
         return output
 
