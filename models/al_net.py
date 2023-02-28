@@ -54,13 +54,13 @@ class CodecBlock(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Encoder
-        x_e0 = self.e0(x)
-        x_e1 = self.e1(x_e0)
-        x = self(x_e1)
+        x_e0 = self.e0(x)  # x = (4, 64, 448, 448)
+        x_e1 = self.e1(x_e0)  # x_e0 = (4, 16, 224, 224)
+        x = self.e2(x_e1)  # x_e1 = (4, 32, 112, 112)
         # Decoder
-        x = self.d0(x)
-        x = torch.cat([self.d1(x), x_e1], dim=1)
-        x = torch.cat([self.d2(x), x_e0], dim=1)
+        x = self.d0(x)  # x = (4, 64, 56, 56)
+        x = self.d1(torch.cat([x, x_e1], dim=1))  # x = (4, 32, 112, 112), x_e1 = (4, 32, 112, 112)
+        x = self.d2(torch.cat([x, x_e0], dim=1))
         return self.d3(x)
 
 
@@ -114,7 +114,11 @@ class DACBlock(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.b0(x) + self.b1(x) + self.b2(x) + self.b3(x)
+        x_b0 = self.b0(x)
+        x_b1 = self.b1(x)
+        x_b2 = self.b2(x)
+        x_b3 = self.b3(x)
+        return x_b0 + x_b1 + x_b2 + x_b3
 
 
 class CELayer(nn.Module):
@@ -137,7 +141,15 @@ class Encoder(nn.Module):
     def __init__(self, act_fn=nn.ReLU) -> NoReturn:
         super(Encoder, self).__init__()
         self.resnet = models.resnet34(weights='IMAGENET1K_V1')
-        self.ce_layer0 = CELayer(channels=64, act_fn=act_fn)
+        self.resnet.conv1 = nn.Conv2d(3, 32, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+        self.resnet.bn1 = nn.BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        self.resnet.layer1[0].conv1 = nn.Conv2d(32, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+        self.resnet.layer1[0].downsample = nn.Sequential(
+            nn.Conv2d(32, 64, kernel_size=(1, 1), stride=(1, 1), bias=False),
+            nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        )
+
+        self.ce_layer0 = CELayer(channels=32, act_fn=act_fn)
         self.ce_layer1 = CELayer(channels=64, act_fn=act_fn)
         self.ce_layer2 = CELayer(channels=128, act_fn=act_fn)
         self.ce_layer3 = CELayer(channels=256, act_fn=act_fn)
@@ -147,7 +159,7 @@ class Encoder(nn.Module):
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         x = self.resnet.conv1(x)
         x = self.resnet.bn1(x)
-        x = self.relu(x)
+        x = self.resnet.relu(x)
         s0 = self.ce_layer0(x)
 
         x = self.resnet.maxpool(s0)
@@ -169,7 +181,7 @@ class Bridge(nn.Module):
 
     def __init__(self, act_fn=nn.ReLU, up_mode: str = "bilinear") -> NoReturn:
         super(Bridge, self).__init__()
-        self.al_module0 = ALModule(channels=64, act_fn=act_fn, up_mode=up_mode)
+        self.al_module0 = ALModule(channels=32, act_fn=act_fn, up_mode=up_mode)
         self.al_module1 = ALModule(channels=64, act_fn=act_fn, up_mode=up_mode)
         self.al_module2 = ALModule(channels=128, act_fn=act_fn, up_mode=up_mode)
         self.al_module3 = ALModule(channels=256, act_fn=act_fn, up_mode=up_mode)
@@ -177,9 +189,9 @@ class Bridge(nn.Module):
     def forward(self, skip0: torch.Tensor, skip1: torch.Tensor, skip2: torch.Tensor, skip3: torch.Tensor) -> Tuple[
         torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         skip0 = self.al_module0(skip0)
-        skip1 = self.al_module0(skip1)
-        skip2 = self.al_module0(skip2)
-        skip3 = self.al_module0(skip3)
+        skip1 = self.al_module1(skip1)
+        skip2 = self.al_module2(skip2)
+        skip3 = self.al_module3(skip3)
         return skip0, skip1, skip2, skip3
 
 
@@ -199,16 +211,16 @@ class DecoderMain(nn.Module):
         x = x.view((1, -1, 512, 14, 14))  # Add an additional dimension
         x = self.d0(x)
         x = x.view((-1, 256, 28, 28))  # Remove the additional dimension
-        x = torch.cat([x, skip3])
+        x = torch.cat([x, skip3], dim=1)
 
         x = self.d1(x)
-        x = torch.cat([x, skip2])
+        x = torch.cat([x, skip2], dim=1)
 
         x = self.d2(x)
-        x = torch.cat([x, skip1])
+        x = torch.cat([x, skip1], dim=1)
 
         x = self.d3(x)
-        x = torch.cat([x, skip0])
+        x = torch.cat([x, skip0], dim=1)
 
         return self.d4(x)
 
@@ -246,8 +258,8 @@ class ALNet(nn.Module):
         self.decoder_aux = DecoderAuxiliary(up_mode=up_mode)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        x, *skip_connections = self.encoder(x)
-        skip_connections = self.bridge(skip_connections)
-        y_main = self.decoder_main(x, skip_connections)
-        y_aux = self.decoder_aux(skip_connections)
+        x, s0, s1, s2, s3 = self.encoder(x)
+        s0, s1, s2, s3 = self.bridge(s0, s1, s2, s3)
+        y_main = self.decoder_main(x, s0, s1, s2, s3)
+        y_aux = self.decoder_aux(s0, s1, s2, s3)
         return y_main, y_aux
