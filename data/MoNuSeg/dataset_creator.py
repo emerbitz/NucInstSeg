@@ -13,7 +13,7 @@ class MoNuSegCreator:
     """
 
     def __init__(self, root: str = "datasets", ) -> NoReturn:
-        self.base_dir = Path(root, "MoNuSeg 2018 Training Data")
+        self.base_dir = Path(root, "MoNuSeg 2018")
         # self.img_dir = Path(self.base_dir, "Tissue Images")
         self.label_dir = Path(self.base_dir, "Annotations")
 
