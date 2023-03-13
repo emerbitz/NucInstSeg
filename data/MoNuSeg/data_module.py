@@ -1,4 +1,5 @@
 from typing import NoReturn
+import random
 import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader, random_split
@@ -6,7 +7,7 @@ from torch.utils.data import DataLoader, random_split
 from data.MoNuSeg.dataset import MoNuSeg
 from data.MoNuSeg.dataset_creator import MoNuSegCreator
 from augmentation.augmentations import RandCrop, RandHorizontalFlip, RandRotate, RandVerticalFlip
-from transformation.transformations import Combine, ToTensor
+from transformation.transformations import Combine, ToTensor, PadZeros
 
 
 class MoNuSegDataModule(pl.LightningDataModule):
@@ -28,13 +29,19 @@ class MoNuSegDataModule(pl.LightningDataModule):
             RandHorizontalFlip(p=0.5),
             RandVerticalFlip(p=0.5),
             RandRotate(degrees=360.),
-            RandCrop(size=(256, 256))
+            PadZeros(padding=12)
         ])
-        self.val_transforms = Combine([  # Currently no effect
+        self.val_transforms = Combine([
             ToTensor(),
-            RandCrop(size=(256, 256))
+            PadZeros(padding=12)
         ])
-        self.test_transforms = None  # To do
+        self.test_transforms = Combine([
+            ToTensor(),
+            PadZeros(padding=12)
+        ])
+        self.train_data: MoNuSeg
+        self.val_data: MoNuSeg
+        self.test_data: MoNuSeg
 
     def prepare_data(self) -> NoReturn:
         creator = MoNuSegCreator(root=self.root)
@@ -46,16 +53,26 @@ class MoNuSegDataModule(pl.LightningDataModule):
 
     def setup(self, stage: str = None) -> NoReturn:
         if stage == "fit" or stage is None:
-            data = MoNuSeg(
+            training_dataset = MoNuSeg.select_data(dataset="Train")
+            random.shuffle(training_dataset)
+            train_dataset, val_dataset = training_dataset[:12], training_dataset[12:]
+
+            self.train_data = MoNuSeg(
                 root=self.root,
                 segmentation_mask=self.seg_masks,
                 contour_mask=self.cont_masks,
                 distance_map=self.dist_maps,
-                split="Train",
+                dataset=train_dataset,
                 transforms=self.train_transforms
             )
-            # Problem?: Same Transformation for train and val split
-            self.train_data, self.val_data = random_split(data, lengths=[12, 4])
+            self.val_data = MoNuSeg(
+                root=self.root,
+                segmentation_mask=self.seg_masks,
+                contour_mask=self.cont_masks,
+                distance_map=self.dist_maps,
+                dataset=val_dataset,
+                transforms=self.val_transforms
+            )
 
         if stage == "test" or stage is None:
             self.test_data = MoNuSeg(
@@ -63,7 +80,7 @@ class MoNuSegDataModule(pl.LightningDataModule):
                 segmentation_mask=self.seg_masks,
                 contour_mask=self.cont_masks,
                 distance_map=self.dist_maps,
-                split="Test",
+                dataset="Test",
                 transforms=self.test_transforms
             )
 
