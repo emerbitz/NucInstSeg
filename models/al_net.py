@@ -200,7 +200,7 @@ class DecoderMain(nn.Module):
 
     def __init__(self, act_fn=nn.ReLU, up_mode: str = "bilinear") -> NoReturn:
         super(DecoderMain, self).__init__()
-        self.d0 = nn.Upsample(size=(256, 28, 28), mode=up_mode)
+        self.up_mode = up_mode
         self.d1 = UpLayer(in_channels=512, out_channels=128, act_fn=act_fn, up_mode=up_mode)
         self.d2 = UpLayer(in_channels=256, out_channels=64, act_fn=act_fn, up_mode=up_mode)
         self.d3 = UpLayer(in_channels=128, out_channels=32, act_fn=act_fn, up_mode=up_mode)
@@ -208,9 +208,10 @@ class DecoderMain(nn.Module):
 
     def forward(self, x: torch.Tensor, skip0: torch.Tensor, skip1: torch.Tensor, skip2: torch.Tensor,
                 skip3: torch.Tensor) -> torch.Tensor:
-        x = x.view((1, -1, 512, 14, 14))  # Add an additional dimension
-        x = self.d0(x)
-        x = x.view((-1, 256, 28, 28))  # Remove the additional dimension
+        *_, height, width = x.size()
+        x = x.view((1, -1, 512, height, width))  # Add an additional dimension
+        x = nn.Upsample(size=(256, 2*height, 2*width), mode=self.up_mode)(x)
+        x = x.view((-1, 256, 2*height, 2*width))  # Remove the additional dimension
         x = torch.cat([x, skip3], dim=1)
 
         x = self.d1(x)
