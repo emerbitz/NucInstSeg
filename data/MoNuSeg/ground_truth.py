@@ -61,6 +61,7 @@ class NucleiInstances:
                 mode="inner",
                 background=False
             )  # Connectivity=1: 4-connected neighborhood, Connectivity=2: 8-connected neighborhood
+            # Find_boundaries(mode="tick") = find_boundaries(mode="inner") logical_or find_boundaries(mode="outer")
             mask = np.logical_or(mask, contours)
         return mask.astype(float)
 
