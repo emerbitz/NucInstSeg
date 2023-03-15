@@ -1,10 +1,10 @@
 import random
-from typing import Tuple
+from typing import Tuple, Union
 import torch
 import torchvision.transforms.functional as TF
 
 from augmentation.augmentation_base import Augmentation
-
+from transformation.utils import remove_zero_stacks
 
 class RandHorizontalFlip(Augmentation):
     def __init__(self, p: float = 0.5):
@@ -39,7 +39,8 @@ class RandRotate(Augmentation):
     def transform(self, img: torch.Tensor, seed: float) -> torch.Tensor:
         random.seed(seed)
         angle = random.random() * self.deg
-        return TF.rotate(img, angle=angle)
+        rotated = TF.rotate(img, angle=angle)
+        return remove_zero_stacks(rotated)
 
 
 class RandCrop(Augmentation):
@@ -50,7 +51,7 @@ class RandCrop(Augmentation):
     def __init__(self, size: Tuple[int, int]):
         self.size = size
 
-    def transform(self, img: torch.Tensor, seed: float) -> torch.Tensor:
+    def transform(self, img: torch.Tensor, seed: float) -> Union[torch.Tensor, None]:
         _, h, w = img.size()
         h_max = h - self.size[0]
         w_max = w - self.size[1]
@@ -60,7 +61,8 @@ class RandCrop(Augmentation):
         w_lower = random.randint(0, w_max)
         w_upper = w_lower + self.size[1]
         random.randint(0, w_max)
-        return img[:, h_lower:h_upper, w_lower:w_upper]
+        crop = img[:, h_lower:h_upper, w_lower:w_upper]
+        return remove_zero_stacks(crop)
 
 
 if __name__ == "__main__":
@@ -68,30 +70,55 @@ if __name__ == "__main__":
     import torchvision.transforms as T
     from data.MoNuSeg.dataset import MoNuSeg
     from data.MoNuSeg.illustrator import Picture
-    from transformation.transformations import ToTensor, Combine
+    from transformation.transformations import ToTensor, Combine, Split, Resize, PadZeros
     from data.MoNuSeg.data_module import MoNuSegDataModule
 
-    # transforms = Combine([
-    #     ToTensor(),
-    #     RandHorizontalFlip(p=0.5),
-    #     RandCrop(size=(10, 10))
-    # ])
-    #
-    # train_data = MoNuSeg(root="../datasets", split="Train", transforms=transforms)
-    # for pair in train_data:
-    #     print(type(pair[0]))
-    #     pic = Picture.from_tensor(pair[0])
-    #     print(pic.size())
-    #     pic.show()
+    transforms = Combine([
+        # ToTensor(),
+        RandVerticalFlip(p=0.5),
+        RandHorizontalFlip(p=0.5),
+        # RandRotate(degrees=360.),
+        # PadZeros(padding=12),
+        # Split(size=(256,256))
+    ])
 
-    data_module = MoNuSegDataModule()
-    data_module.prepare_data()
-    data_module.setup(stage="fit")
-    dataloader = data_module.train_dataloader()
-    for batch in dataloader:
-        for elements in batch:
-            element = elements[0,:,:,:]
-            pic = Picture.from_tensor(element)
-            print(pic.size())
-            pic.show()
+    train_data = MoNuSeg(root="../datasets", dataset="Train", instances=True, labels=True, size="256", transforms=transforms)
+    pair = train_data[0]
+    for element in pair:
+        if isinstance(element, torch.Tensor):
+            channels, *_ = element.shape
+            if channels > 3:
+                print(f"Number of instances: {channels}")
+                # for img in element:
+                #     Picture.from_tensor(img).show()
+            else:
+                Picture.from_tensor(element).show()
+        elif isinstance(element, str):
+            print(element)
+        else:
+            print(type(element))
 
+    # data = MoNuSeg(root="../datasets", split="Test", transforms=transforms)
+    # loader = DataLoader(dataset=data, batch_size=8, shuffle=False)
+    # imgs, seg_masks, cont_masks, *_ = next(iter(loader))
+    # print(imgs[0].shape)
+    # pic = Picture.from_tensor(data[0][1])
+    # print(pic.size())
+    # pic.show()
+
+    # data_module = MoNuSegDataModule(data_root="../datasets")
+    # data_module.prepare_data()
+    # data_module.setup(stage="fit")
+    # train_loader = data_module.train_dataloader()
+    # img, *_ = next(iter(train_loader))
+    # print(img.size())
+    # val_loader = data_module.val_dataloader()
+    # img, *_ = next(iter(val_loader))
+    # print(img.size())
+    # for i in range(10):
+    #     for batch in dataloader:
+    #         imgs, *_ = batch
+    #         element = imgs[0,:,:,:]
+    #         pic = Picture.from_tensor(element)
+    #         print(pic.size())
+    #         pic.show()
