@@ -1,6 +1,8 @@
 import numpy as np
-from typing import Any, List, NoReturn, Union
+from typing import Any, List, NoReturn, Tuple, Union
 from pathlib import Path
+
+import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
@@ -66,16 +68,15 @@ class MoNuSeg(Dataset):
                    "TCGA-IZ-8196-01A-01-BS1",
                    "TCGA-ZF-A9R5-01A-01-TS1"]
 
-    def __init__(self, root: str = "datasets", segmentation_mask: bool = True, contour_mask: bool = True,
-                 distance_map: bool = True, instances: bool = False, transforms=None, dataset: Union[List[str], str] = "Whole") -> NoReturn:
-        self.segmentation_mask = segmentation_mask
-        self.contour_mask = contour_mask
-        self.distance_map = distance_map
+    def __init__(self, root: str = "datasets", segmentation_masks: bool = True, contour_masks: bool = True,
+                 distance_maps: bool = True, instances: bool = False, labels: bool = False, transforms=None,
+                 dataset: Union[List[str], str] = "Whole", size: str = "Original") -> NoReturn:
+        self.segmentation_mask = segmentation_masks
+        self.contour_mask = contour_masks
+        self.distance_map = distance_maps
         self.instances = instances
+        self.labels = labels
         self.transforms = transforms
-
-        if self.instances and self.transforms is not None:
-            print("Please note: Transforms are not applied to the nuclei instances!")
 
         base_dir = Path(root, "MoNuSeg 2018")
         self.img_dir = Path(base_dir, "Tissue Images")
@@ -83,12 +84,24 @@ class MoNuSeg(Dataset):
         self.seg_mask_dir = Path(base_dir, "Segmentation masks")
         self.cont_mask_dir = Path(base_dir, "Contour masks")
         self.dist_map_dir = Path(base_dir, "Distance maps")
+
         if isinstance(dataset, str):
-            self.data = MoNuSeg.select_data(dataset)
+            data = self.select_data(dataset)
         elif isinstance(dataset, list):
-            self.data = dataset
+            data = dataset
         else:
             raise TypeError(f"Dataset should be of type list or str. Got instead {type(dataset)}.")
+
+        if size == "Original":
+            self.data = data
+        elif size == "256":
+            self.data = []
+            for label in data:
+                for value in range(0, 16):
+                    self.data.append(label + "_256_" + str(value))
+        else:
+            raise ValueError(f"Size should be 'Original' or '256'. Got instead {size}")
+        self.size = size
 
     def __getitem__(self, idx: int) -> List[Any]:
         """
@@ -97,30 +110,16 @@ class MoNuSeg(Dataset):
         file = self.data[idx]
         output = []
 
-        img_file = Path(self.img_dir, file + ".tif")
-        img = Image.open(img_file)
-        output.append(img)
-
-        if self.segmentation_mask:
-            seg_mask_file = Path(self.seg_mask_dir, file + ".npy")
-            seg_mask = np.load(str(seg_mask_file))
-            output.append(seg_mask)
-        if self.contour_mask:
-            cont_mask_file = Path(self.cont_mask_dir, file + ".npy")
-            cont_mask = np.load(str(cont_mask_file))
-            output.append(cont_mask)
-        if self.distance_map:
-            dist_map_file = Path(self.dist_map_dir, file + ".npy")
-            dist_map = np.load(str(dist_map_file))
-            output.append(dist_map)
+        if self.size == "Original":
+            output = self._get_item_original(file=file, output=output)
+        elif self.size == "256":
+            output = self._get_item_256(file=file, output=output)
 
         if self.transforms is not None:
             output = self.transforms(output)
 
-        if self.instances:
-            inst_file = Path(self.inst_dir, file + ".xml")
-            inst = NucleiInstances.from_MoNuSeg(inst_file).nuc_inst
-            output.append(inst)
+        if self.labels:
+            output.append(file)
 
         return output
 
@@ -153,3 +152,53 @@ class MoNuSeg(Dataset):
         else:
             raise ValueError(f"Dataset should be of value 'Train Kaggle', 'Test Kaggle', Train', 'Test', 'Surplus', 'Whole'. Got instead {dataset}.")
         return data
+
+    def _get_item_original(self, file: str, output: list) -> List[Any]:
+        """Retrieves the image and associated ground truth(s) in the original size (i.e., 1000x1000 pixels)."""
+        img_file = Path(self.img_dir, file + ".tif")
+        img = Image.open(img_file)
+        output.append(img)
+
+        if self.segmentation_mask:
+            seg_mask_file = Path(self.seg_mask_dir, file + ".npy")
+            seg_mask = np.load(str(seg_mask_file))
+            output.append(seg_mask)
+        if self.contour_mask:
+            cont_mask_file = Path(self.cont_mask_dir, file + ".npy")
+            cont_mask = np.load(str(cont_mask_file))
+            output.append(cont_mask)
+        if self.distance_map:
+            dist_map_file = Path(self.dist_map_dir, file + ".npy")
+            dist_map = np.load(str(dist_map_file))
+            output.append(dist_map)
+        if self.instances:
+            inst_file = Path(self.inst_dir, file + ".xml")
+            inst = NucleiInstances.from_MoNuSeg(inst_file).as_ndarray()
+            output.append(inst)
+
+        return output
+
+    def _get_item_256(self, file: str, output: list) -> List[Any]:
+        """Retrieves the image and associated ground truth(s) in the size 256x256 pixels."""
+        img_file = Path(self.img_dir, file + ".pt")
+        img = torch.load(img_file)
+        output.append(img)
+
+        if self.segmentation_mask:
+            seg_mask_file = Path(self.seg_mask_dir, file + ".pt")
+            seg_mask = torch.load(seg_mask_file)
+            output.append(seg_mask)
+        if self.contour_mask:
+            cont_mask_file = Path(self.cont_mask_dir, file + ".pt")
+            cont_mask = torch.load(cont_mask_file)
+            output.append(cont_mask)
+        if self.distance_map:
+            dist_map_file = Path(self.dist_map_dir, file + ".pt")
+            dist_map = torch.load(dist_map_file)
+            output.append(dist_map)
+        if self.instances:
+            inst_file = Path(self.inst_dir, file + ".pt")
+            inst = torch.load(inst_file)
+            output.append(inst)
+
+        return output
