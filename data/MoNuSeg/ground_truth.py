@@ -17,6 +17,11 @@ class NucleiInstances:
     def __getitem__(self, idx) -> np.ndarray:
         return self.nuc_inst[idx]
 
+    def as_ndarray(self) -> np.ndarray:
+        array = np.array(self.nuc_inst)
+        return np.transpose(array, (1, 2, 0))
+
+
     @staticmethod
     def from_MoNuSeg(label: Path) -> "NucleiInstances":
         """
