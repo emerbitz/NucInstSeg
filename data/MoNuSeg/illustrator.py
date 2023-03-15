@@ -18,17 +18,25 @@ class Picture:
     @staticmethod
     def from_tensor(img: Tensor) -> "Picture":
         """Converts an image as torch.Tensor into an instance of the Picture class"""
-        img = Picture.tensor_to_array(img)
+        img = Picture.tensor_to_ndarray(img)
         return Picture(img)
 
     @staticmethod
-    def tensor_to_array(img: Tensor) -> np.array:
+    def tensor_to_ndarray(img: Tensor) -> np.array:
         """Converts torch.Tensor into np.ndarray"""
-
-        c_channels = img.size()[0]
-        if c_channels > 1:
-            return img.permute((1, 2, 0)).numpy()  # Conversion for RGB image
-        return img[0].numpy()  # Conversion for grayscale image
+        dim = img.dim()
+        if dim == 3:
+            channels, *_ = img.size()
+            if channels == 3:
+                return img.permute((1, 2, 0)).numpy()  # Conversion for RGB image (3, H, W)
+            elif channels == 1:
+                return img[0].numpy()  # Conversion for grayscale image (1, H, W)
+            else:
+                raise ValueError(f"Img should have one or three channels. Got instead {channels} channels.")
+        elif dim == 2:
+            return img.numpy()  # Conversion for channel-less image (H, W)
+        else:
+            raise ValueError(f"Img should have two or three dimensions. Got instead {img.dim()} dimensions.")
 
     def show(self) -> NoReturn:
         """Displays the image"""
