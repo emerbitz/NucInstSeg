@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader, random_split
 
 from data.MoNuSeg.dataset import MoNuSeg
 from data.MoNuSeg.dataset_creator import MoNuSegCreator
+from data.MoNuSeg.dataset_patcher import MoNuSegPatcher
 from augmentation.augmentations import RandCrop, RandHorizontalFlip, RandRotate, RandVerticalFlip
 from transformation.transformations import Combine, ToTensor, PadZeros
 
@@ -50,6 +51,19 @@ class MoNuSegDataModule(pl.LightningDataModule):
             contour_masks=self.cont_masks,
             distance_maps=self.dist_maps
         )
+        patcher = MoNuSegPatcher(
+            dataset=MoNuSeg(
+                root=self.root,
+                segmentation_masks=self.seg_masks,
+                contour_masks=self.cont_masks,
+                distance_maps=self.dist_maps,
+                instances=True,
+                transforms=ToTensor(),
+                dataset="Train Kaggle"
+            )
+        )
+        patcher.split_and_save(patch_size=(256, 256))
+
 
     def setup(self, stage: str = None) -> NoReturn:
         if stage == "fit" or stage is None:
@@ -59,17 +73,17 @@ class MoNuSegDataModule(pl.LightningDataModule):
 
             self.train_data = MoNuSeg(
                 root=self.root,
-                segmentation_mask=self.seg_masks,
-                contour_mask=self.cont_masks,
-                distance_map=self.dist_maps,
+                segmentation_masks=self.seg_masks,
+                contour_masks=self.cont_masks,
+                distance_maps=self.dist_maps,
                 dataset=train_dataset,
                 transforms=self.train_transforms
             )
             self.val_data = MoNuSeg(
                 root=self.root,
-                segmentation_mask=self.seg_masks,
-                contour_mask=self.cont_masks,
-                distance_map=self.dist_maps,
+                segmentation_masks=self.seg_masks,
+                contour_masks=self.cont_masks,
+                distance_maps=self.dist_maps,
                 dataset=val_dataset,
                 transforms=self.val_transforms
             )
@@ -77,9 +91,9 @@ class MoNuSegDataModule(pl.LightningDataModule):
         if stage == "test" or stage is None:
             self.test_data = MoNuSeg(
                 root=self.root,
-                segmentation_mask=self.seg_masks,
-                contour_mask=self.cont_masks,
-                distance_map=self.dist_maps,
+                segmentation_masks=self.seg_masks,
+                contour_masks=self.cont_masks,
+                distance_maps=self.dist_maps,
                 dataset="Test",
                 transforms=self.test_transforms
             )
