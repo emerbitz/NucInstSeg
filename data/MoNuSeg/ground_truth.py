@@ -2,9 +2,10 @@ import numpy as np
 from pathlib import Path
 from typing import List, NoReturn
 from xml.dom import minidom
+import torch
 
 from skimage.draw import polygon2mask
-from skimage.segmentation import find_boundaries
+from skimage.segmentation import find_boundaries, flood
 
 
 class NucleiInstances:
@@ -18,9 +19,13 @@ class NucleiInstances:
         return self.nuc_inst[idx]
 
     def as_ndarray(self) -> np.ndarray:
+        """Converts the nuclei instances as List[np.ndarray] into a np.ndarray of shape (H, W, #nuclei)"""
         array = np.array(self.nuc_inst)
         return np.transpose(array, (1, 2, 0))
 
+    def as_tensor(self) -> torch.Tensor:
+        """Converts the nuclei instances as List[np.ndarray] into a torch.Tensor of shape (#nuclei, H, W)"""
+        return torch.tensor(self.nuc_inst)
 
     @staticmethod
     def from_MoNuSeg(label: Path) -> "NucleiInstances":
@@ -40,6 +45,21 @@ class NucleiInstances:
                 polygon.append((float(vertex.getAttribute("Y")), float(vertex.getAttribute("X"))))
             nuc_inst.append(polygon2mask(image_shape=img_shape, polygon=polygon))
         return NucleiInstances(nuc_inst)
+
+    @staticmethod
+    def from_seg_mask(seg_mask: torch.Tensor) -> "NucleiInstances":
+        """Extracts nuclei instances from a segmentation mask"""
+
+        seg_mask = seg_mask.squeeze().numpy()  # Conversion to np.ndarray of shape (H, W)
+        height, width = seg_mask.shape
+        nuclei = []
+        for y in range(height):
+            for x in range(width):
+                if seg_mask[y, x] is True:
+                    nucleus = flood(seg_mask, seed_point=(y, x))  # Region growing with 8-connected neighborhood
+                    seg_mask = np.logical_xor(seg_mask, nucleus)  # Removes the nucleus from the segmentation mask
+                    nuclei.append(nucleus)
+        return NucleiInstances(nuclei)
 
     def to_seg_mask(self) -> np.ndarray:
         """
