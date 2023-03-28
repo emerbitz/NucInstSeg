@@ -154,13 +154,11 @@ if __name__ == "__main__":
     from data.MoNuSeg.illustrator import Picture
     from data.MoNuSeg.data_module import MoNuSegDataModule
     from postprocessing.segmentation import NucleiSplitter
-    from evaluation.metrics import PQ, AJI
 
     data_module = MoNuSegDataModule(
         seg_masks=True,
         cont_masks=True,
         dist_maps=False,
-        instances=True,
         labels=True,
         data_root="datasets"
     )
