@@ -1,4 +1,3 @@
-from typing import NoReturn
 import random
 import pytorch_lightning as pl
 import torch
@@ -18,13 +17,13 @@ class MoNuSegDataModule(pl.LightningDataModule):
     """
 
     def __init__(self, seg_masks: bool = True, cont_masks: bool = True, dist_maps: bool = True, labels: bool = False,
-                 instances: bool = True, data_root: str = "datasets"):
+                 data_root: str = "datasets"):
         super().__init__()
         self.seg_masks = seg_masks
         self.cont_masks = cont_masks
         self.dist_maps = dist_maps
         self.labels = labels
-        self.instances = instances
+        # self.instances = instances
         self.root = data_root
 
         self.batch_size = 4
@@ -45,7 +44,7 @@ class MoNuSegDataModule(pl.LightningDataModule):
         self.val_data: MoNuSeg
         self.test_data: MoNuSeg
 
-    def prepare_data(self) -> NoReturn:
+    def prepare_data(self) -> None:
         creator = MoNuSegCreator(root=self.root)
         creator.save_ground_truths(
             segmentation_masks=self.seg_masks,
@@ -65,7 +64,7 @@ class MoNuSegDataModule(pl.LightningDataModule):
         )
         patcher.split_and_save(patch_size=self.img_size)
 
-    def setup(self, stage: str = None) -> NoReturn:
+    def setup(self, stage: str = None) -> None:
         if stage == "fit" or stage is None:
             # Splitting of train dataset into train and validation dataset
             training_dataset = MoNuSeg.select_data(dataset="Train")
@@ -78,7 +77,7 @@ class MoNuSegDataModule(pl.LightningDataModule):
                 contour_masks=self.cont_masks,
                 distance_maps=self.dist_maps,
                 labels=self.labels,
-                instances=self.instances,
+                instances=False,
                 dataset=train_dataset,
                 transforms=self.train_transforms,
                 size="256"
@@ -89,7 +88,7 @@ class MoNuSegDataModule(pl.LightningDataModule):
                 contour_masks=self.cont_masks,
                 distance_maps=self.dist_maps,
                 labels=self.labels,
-                instances=self.instances,
+                instances=True,
                 dataset=val_dataset,
                 transforms=self.val_transforms,
                 size="256"
@@ -102,7 +101,7 @@ class MoNuSegDataModule(pl.LightningDataModule):
                 contour_masks=self.cont_masks,
                 distance_maps=self.dist_maps,
                 labels=self.labels,
-                instances=self.instances,
+                instances=True,
                 dataset="Test",
                 transforms=self.test_transforms,
                 size="256"
