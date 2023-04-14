@@ -1,7 +1,8 @@
 import random
+from typing import Tuple
 import pytorch_lightning as pl
 import torch
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 
 from data.MoNuSeg.dataset import MoNuSeg
 from data.MoNuSeg.dataset_creator import MoNuSegCreator
@@ -17,28 +18,28 @@ class MoNuSegDataModule(pl.LightningDataModule):
     """
 
     def __init__(self, seg_masks: bool = True, cont_masks: bool = True, dist_maps: bool = True, labels: bool = False,
-                 data_root: str = "datasets"):
+                 data_root: str = "datasets", batch_size: int = 8, img_size: Tuple[int, int] = (256, 256),
+                 train_transforms=Combine([RandHorizontalFlip(p=0.5),
+                                           RandVerticalFlip(p=0.5),
+                                           RandRotate(degrees=360.)]),
+                 val_transforms=None,
+                 test_transforms=None
+                 ):
         super().__init__()
+        self.save_hyperparameters()
         self.seg_masks = seg_masks
         self.cont_masks = cont_masks
         self.dist_maps = dist_maps
         self.labels = labels
-        # self.instances = instances
         self.root = data_root
 
-        self.batch_size = 4
-        self.img_size = (256, 256)
+        self.batch_size = batch_size
+        self.img_size = img_size
         self.threads = torch.get_num_threads()
 
-        self.train_transforms = Combine([
-            # ToTensor(),
-            RandHorizontalFlip(p=0.5),
-            RandVerticalFlip(p=0.5),
-            RandRotate(degrees=360.),
-            # RandCrop(size=(256, 256)),
-        ])
-        self.val_transforms = None
-        self.test_transforms = None
+        self.train_transforms = train_transforms
+        self.val_transforms = val_transforms
+        self.test_transforms = test_transforms
 
         self.train_data: MoNuSeg
         self.val_data: MoNuSeg
@@ -51,18 +52,19 @@ class MoNuSegDataModule(pl.LightningDataModule):
             contour_masks=self.cont_masks,
             distance_maps=self.dist_maps
         )
-        patcher = MoNuSegPatcher(
-            dataset=MoNuSeg(
-                root=self.root,
-                segmentation_masks=self.seg_masks,
-                contour_masks=self.cont_masks,
-                distance_maps=self.dist_maps,
-                instances=True,
-                transforms=ToTensor(),
-                dataset="Train Kaggle"
-            )
-        )
-        patcher.split_and_save(patch_size=self.img_size)
+        # To do: Check for file existence
+        # patcher = MoNuSegPatcher(
+        #     dataset=MoNuSeg(
+        #         root=self.root,
+        #         segmentation_masks=self.seg_masks,
+        #         contour_masks=self.cont_masks,
+        #         distance_maps=self.dist_maps,
+        #         instances=True,
+        #         transforms=ToTensor(),
+        #         dataset="Train Kaggle"
+        #     )
+        # )
+        # patcher.split_and_save(patch_size=self.img_size)
 
     def setup(self, stage: str = None) -> None:
         if stage == "fit" or stage is None:
@@ -108,10 +110,13 @@ class MoNuSegDataModule(pl.LightningDataModule):
             )
 
     def train_dataloader(self) -> DataLoader:
-        return DataLoader(self.train_data, batch_size=self.batch_size, shuffle=True, num_workers=self.threads, collate_fn=custom_collate)
+        return DataLoader(self.train_data, batch_size=self.batch_size, shuffle=True, num_workers=self.threads,
+                          collate_fn=custom_collate)
 
     def val_dataloader(self) -> DataLoader:
-        return DataLoader(self.val_data, batch_size=self.batch_size, shuffle=False, num_workers=self.threads, collate_fn=custom_collate)
+        return DataLoader(self.val_data, batch_size=self.batch_size, shuffle=False, num_workers=self.threads,
+                          collate_fn=custom_collate)
 
     def test_dataloader(self) -> DataLoader:
-        return DataLoader(self.test_data, batch_size=self.batch_size, shuffle=False, num_workers=self.threads, collate_fn=custom_collate)
+        return DataLoader(self.test_data, batch_size=self.batch_size, shuffle=False, num_workers=self.threads,
+                          collate_fn=custom_collate)
