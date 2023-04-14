@@ -1,9 +1,9 @@
-from typing import Optional, Tuple
+from typing import Optional, Dict, Union, Any
 import torch
 from torch import Tensor
 from torchmetrics import Metric
 
-from evaluation.utils import tensor_intersection, intersection_over_union, tensor_union
+from evaluation.utils import tensor_intersection, intersection_over_union, tensor_union, is_empty
 from evaluation.metrics_base import Score
 
 
@@ -35,11 +35,11 @@ class PQ(Score, Metric):
         self.FN += len(gt_inst) - TP  # Undetected nuclei
         self.FP += len(pred_inst) - TP  # Detected non-existing nuclei
 
-    def compute(self) -> Tuple[Tensor, Tensor, Tensor]:
+    def compute(self) -> Dict[str, Tensor]:
         """Computes the Detection Quality (DQ), the Segmentation Quality (SQ) and the Panoptic Quality (PQ)."""
         dq = 2 * self.TP / (2 * self.TP + self.FN + self.FP)
         sq = self.IoU / self.TP
-        return dq, sq, dq * sq
+        return {"DQ": dq, "SQ": sq, "PQ": dq * sq}
 
 
 # class F1Score(Score, Metric):
@@ -105,23 +105,26 @@ class AJI(Score, Metric):
 
     def evaluate(self, pred_inst: Tensor, gt_inst: Tensor) -> None:
         """Updates the states intersection, union and false_positives."""
-        used_index = []
-        for inst in gt_inst:
-            iou = []
-            for pred in pred_inst:
-                iou.append(intersection_over_union(pred, inst))
-            max_iou = max(iou)
-            j = iou.index(max_iou)
-            self.intersection += tensor_intersection(pred_inst[j], inst)
-            self.union += tensor_union(pred_inst[j], inst)
-            used_index.append(j)
-        for index in range(len(pred_inst)):
-            if index not in used_index:
-                self.false_positives += pred_inst[index].sum()
+        if not is_empty(pred_inst):
+            used_index = []
+            for inst in gt_inst:
+                iou = []
+                for pred in pred_inst:
+                    iou.append(intersection_over_union(pred, inst))
+                max_iou = max(iou)
+                j = iou.index(max_iou)
+                self.intersection += tensor_intersection(pred_inst[j], inst)
+                self.union += tensor_union(pred_inst[j], inst)
+                used_index.append(j)
+            for index in range(len(pred_inst)):
+                if index not in used_index:
+                    self.false_positives += pred_inst[index].sum()
+        else:
+            self.union += gt_inst.sum()
 
-    def compute(self) -> Tensor:
+    def compute(self) -> Dict[str, Tensor]:
         """Computes the Aggregated Jaccard Index (AJI)."""
-        return self.intersection / (self.union + self.false_positives)
+        return {"AJI": self.intersection / (self.union + self.false_positives)}
 
 
 # class Proposed(Score, Metric):
@@ -153,7 +156,7 @@ if __name__ == "__main__":
     from data.MoNuSeg.dataset import MoNuSeg
     from data.MoNuSeg.illustrator import Picture
     from data.MoNuSeg.data_module import MoNuSegDataModule
-    from postprocessing.segmentation import NucleiSplitter
+    from postprocessing.segmentation import InstanceExtractor
 
     data_module = MoNuSegDataModule(
         seg_masks=True,
@@ -172,7 +175,7 @@ if __name__ == "__main__":
 
     for batch, (imgs, seg_maps, cont_maps, instances, labels) in enumerate(test_loader):
         print(labels)
-        pred = NucleiSplitter(seg=seg_maps, cont=cont_maps).to_instances()
+        pred = InstanceExtractor(seg=seg_maps, cont=cont_maps).get_instances()
 
         pq_metric.update(pred, instances)
 
@@ -180,7 +183,7 @@ if __name__ == "__main__":
         if batch == 3:
             break
 
-    f1, sq, pq = pq_metric.compute()
+    f1, sq, pq = pq_metric.compute().values
     print(f"F1-Score: {f1}")
     print(f"Segmentation Quality (SQ): {sq}")
     print(f"Panoptic Quality (PQ): {pq}")
