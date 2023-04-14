@@ -12,6 +12,7 @@ class DownLayer(nn.Module):
         super(DownLayer, self).__init__()
         self.layer = nn.Sequential(
             nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(num_features=out_channels),  # Not mentioned in paper
             act_fn(),  # Activation function not specified
             nn.MaxPool2d(kernel_size=2)
         )
@@ -28,6 +29,7 @@ class UpLayer(nn.Module):
         self.layer = nn.Sequential(
             nn.Upsample(scale_factor=2.0, mode=up_mode),  # Mode not specified
             nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(num_features=out_channels),  # Not mentioned in paper
             act_fn()  # Activation function not specified
         )
 
@@ -49,6 +51,7 @@ class CodecBlock(nn.Module):
         self.d3 = nn.Sequential(
             nn.Upsample(scale_factor=1.0, mode=up_mode),  # Mode not specified
             nn.Conv2d(in_channels=feature_num, out_channels=1, kernel_size=1, stride=1),
+            nn.BatchNorm2d(num_features=1),  # Not mentioned in paper
             nn.Sigmoid()
         )
 
@@ -86,30 +89,40 @@ class DACBlock(nn.Module):
         super(DACBlock, self).__init__()
         self.b0 = nn.Sequential(
             nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(num_features=channels),  # Not mentioned in paper
             act_fn()
         )
         self.b1 = nn.Sequential(
             nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=3, padding=3, dilation=3),
+            nn.BatchNorm2d(num_features=channels),  # Not mentioned in paper
             act_fn(),
             nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=1),
+            nn.BatchNorm2d(num_features=channels),  # Not mentioned in paper
             act_fn()
         )
         self.b2 = nn.Sequential(
             nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=1),
+            nn.BatchNorm2d(num_features=channels),  # Not mentioned in paper
             act_fn(),
             nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=3, padding=3, dilation=3),
+            nn.BatchNorm2d(num_features=channels),  # Not mentioned in paper
             act_fn(),
             nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=1),
+            nn.BatchNorm2d(num_features=channels),  # Not mentioned in paper
             act_fn()
         )
         self.b3 = nn.Sequential(
             nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=1),
+            nn.BatchNorm2d(num_features=channels),  # Not mentioned in paper
             act_fn(),
             nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=3, padding=3, dilation=3),
+            nn.BatchNorm2d(num_features=channels),  # Not mentioned in paper
             act_fn(),
             nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=3, padding=5, dilation=5),
+            nn.BatchNorm2d(num_features=channels),  # Not mentioned in paper
             act_fn(),
             nn.Conv2d(in_channels=channels, out_channels=channels, kernel_size=1),
+            nn.BatchNorm2d(num_features=channels),  # Not mentioned in paper
             act_fn()
         )
 
