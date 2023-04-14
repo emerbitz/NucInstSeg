@@ -2,6 +2,14 @@ import torch
 from torch import Tensor
 
 
+def is_empty(tensor: Tensor) -> bool:
+    """Checks whether a tensor is empty."""
+    if tensor.numel() == 0:
+        return True
+    else:
+        return False
+
+
 def is_batched(tensor: Tensor) -> bool:
     """Checks whether a tensor has shape (B, C, H, W)."""
     if tensor.dim() == 4:
