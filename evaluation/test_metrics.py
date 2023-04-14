@@ -4,6 +4,7 @@ import torch
 
 from evaluation.metrics import PQ, AJI
 
+
 class TestPQ(unittest.TestCase):
     """Unite test case for the PQ class."""
 
@@ -54,7 +55,7 @@ class TestPQ(unittest.TestCase):
                                 [1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 1, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool)
-        dq, sq, pq = self.metric(pred, target)
+        dq, sq, pq = self.metric(pred, target).values()
         with self.subTest(msg="TP"):
             self.assertEqual(self.metric.TP, torch.tensor(0, dtype=torch.int))
         with self.subTest(msg="FN"):
@@ -114,7 +115,7 @@ class TestPQ(unittest.TestCase):
                                 [1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 1, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool)
-        dq, sq, pq = self.metric(pred, target)
+        dq, sq, pq = self.metric(pred, target).values()
         with self.subTest(msg="TP"):
             self.assertEqual(self.metric.TP, torch.tensor(1, dtype=torch.int))
         with self.subTest(msg="FN"):
@@ -174,7 +175,7 @@ class TestPQ(unittest.TestCase):
                                 [1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 1, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool)
-        dq, sq, pq = self.metric(pred, target)
+        dq, sq, pq = self.metric(pred, target).values()
         with self.subTest(msg="TP"):
             self.assertEqual(self.metric.TP, torch.tensor(1, dtype=torch.int))
         with self.subTest(msg="FN"):
@@ -245,7 +246,7 @@ class TestPQ(unittest.TestCase):
                                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool)
-        dq, sq, pq = self.metric(pred, target)
+        dq, sq, pq = self.metric(pred, target).values()
         with self.subTest(msg="TP"):
             self.assertEqual(self.metric.TP, torch.tensor(1, dtype=torch.int))
         with self.subTest(msg="FN"):
@@ -253,13 +254,13 @@ class TestPQ(unittest.TestCase):
         with self.subTest(msg="FP"):
             self.assertEqual(self.metric.FP, torch.tensor(1, dtype=torch.int))
         with self.subTest(msg="IoU"):
-            self.assertEqual(self.metric.IoU, torch.tensor(7/12, dtype=torch.float))
+            self.assertEqual(self.metric.IoU, torch.tensor(7 / 12, dtype=torch.float))
         with self.subTest(msg="DQ"):
             self.assertEqual(dq, torch.tensor(0.4, dtype=torch.float))
         with self.subTest(msg="SQ"):
-            self.assertEqual(sq, torch.tensor(7/12, dtype=torch.float))
+            self.assertEqual(sq, torch.tensor(7 / 12, dtype=torch.float))
         with self.subTest(msg="PQ"):
-            self.assertEqual(pq, torch.tensor(0.4, dtype=torch.float) * torch.tensor(7/12, dtype=torch.float))
+            self.assertEqual(pq, torch.tensor(0.4, dtype=torch.float) * torch.tensor(7 / 12, dtype=torch.float))
 
     def test_4(self):
         pred = torch.tensor([[[0, 0, 1, 1, 0, 0, 0, 0, 0, 0],
@@ -295,7 +296,7 @@ class TestPQ(unittest.TestCase):
                                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool)
 
-        dq, sq, pq = self.metric(pred, target)
+        dq, sq, pq = self.metric(pred, target).values()
         with self.subTest(msg="TP"):
             self.assertEqual(self.metric.TP, torch.tensor(1, dtype=torch.int))
         with self.subTest(msg="FN"):
@@ -305,34 +306,34 @@ class TestPQ(unittest.TestCase):
         with self.subTest(msg="IoU"):
             self.assertEqual(self.metric.IoU, torch.tensor(0.6, dtype=torch.float))
         with self.subTest(msg="DQ"):
-            self.assertEqual(dq, torch.tensor(2/3, dtype=torch.float))
+            self.assertEqual(dq, torch.tensor(2 / 3, dtype=torch.float))
         with self.subTest(msg="SQ"):
             self.assertEqual(sq, torch.tensor(0.6, dtype=torch.float))
         with self.subTest(msg="PQ"):
-            self.assertEqual(pq, torch.tensor(0.6, dtype=torch.float) * torch.tensor(2/3, dtype=torch.float))
+            self.assertEqual(pq, torch.tensor(0.6, dtype=torch.float) * torch.tensor(2 / 3, dtype=torch.float))
 
     def test_5(self):
         pred = (torch.tensor([[[1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-                              [1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-                              [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
+                               [1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+                               [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
 
-                             [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [1, 1, 0, 0, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool),
+                              [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                               [1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+                               [1, 1, 0, 0, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool),
 
                 torch.tensor([[[1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
                                [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
@@ -389,7 +390,7 @@ class TestPQ(unittest.TestCase):
                                  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool))
 
-        dq, sq, pq = self.metric(pred, target)
+        dq, sq, pq = self.metric(pred, target).values()
         with self.subTest(msg="TP"):
             self.assertEqual(self.metric.TP, torch.tensor(2, dtype=torch.int))
         with self.subTest(msg="FN"):
@@ -399,11 +400,11 @@ class TestPQ(unittest.TestCase):
         with self.subTest(msg="IoU"):
             self.assertEqual(self.metric.IoU, torch.tensor(1.7, dtype=torch.float))
         with self.subTest(msg="DQ"):
-            self.assertEqual(dq, torch.tensor(4/7, dtype=torch.float))
+            self.assertEqual(dq, torch.tensor(4 / 7, dtype=torch.float))
         with self.subTest(msg="SQ"):
             self.assertEqual(sq, torch.tensor(0.85, dtype=torch.float))
         with self.subTest(msg="PQ"):
-            self.assertEqual(pq, torch.tensor(4/7, dtype=torch.float) * torch.tensor(0.85, dtype=torch.float))
+            self.assertEqual(pq, torch.tensor(4 / 7, dtype=torch.float) * torch.tensor(0.85, dtype=torch.float))
 
     def test_TPs_only(self):
         target = torch.tensor([[[1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
@@ -427,7 +428,7 @@ class TestPQ(unittest.TestCase):
                                 [1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 1, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool)
-        dq, sq, pq = self.metric(target, target)
+        dq, sq, pq = self.metric(target, target).values()
         with self.subTest(msg="TP"):
             self.assertEqual(self.metric.TP, torch.tensor(2, dtype=torch.int))
         with self.subTest(msg="FN"):
@@ -446,7 +447,7 @@ class TestPQ(unittest.TestCase):
     def test_return_type(self):
         pred = torch.tensor([[[1], [1]], [[0], [1]]], dtype=torch.bool)
         target = torch.tensor([[[1], [0]], [[0], [1]]], dtype=torch.bool)
-        dq, sq, pq = self.metric(pred, target)
+        dq, sq, pq = self.metric(pred, target).values()
         with self.subTest(msg="TP"):
             self.assertEqual(self.metric.TP, torch.tensor(1, dtype=torch.int))
         with self.subTest(msg="FN"):
@@ -468,9 +469,29 @@ class TestPQ(unittest.TestCase):
         with self.subTest(msg="PQ type"):
             self.assertIsInstance(pq, torch.Tensor)
 
+    def test_empty(self):
+        pred = torch.tensor(data=(), dtype=torch.bool)
+        target = torch.tensor([[[1], [0]], [[0], [1]]], dtype=torch.bool)
+        dq, sq, pq = self.metric(pred, target).values()
+        with self.subTest(msg="TP"):
+            self.assertEqual(self.metric.TP, torch.tensor(0, dtype=torch.int))
+        with self.subTest(msg="FN"):
+            self.assertEqual(self.metric.FN, torch.tensor(2, dtype=torch.int))
+        with self.subTest(msg="FP"):
+            self.assertEqual(self.metric.FP, torch.tensor(0, dtype=torch.int))
+        with self.subTest(msg="IoU"):
+            self.assertEqual(self.metric.IoU, torch.tensor(0, dtype=torch.float))
+        with self.subTest(msg="DQ"):
+            self.assertEqual(dq, torch.tensor(0, dtype=torch.float))
+        with self.subTest(msg="SQ"):
+            self.assertTrue(sq.isnan())
+        with self.subTest(msg="PQ"):
+            self.assertTrue(pq.isnan())
+
 
 class TestAJI(unittest.TestCase):
     """Unite test case for the AJI class."""
+
     def setUp(self) -> None:
         self.metric = AJI()
 
@@ -518,7 +539,7 @@ class TestAJI(unittest.TestCase):
                                 [1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 1, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool)
-        aji = self.metric(pred, target)
+        aji = self.metric(pred, target)["AJI"]
         with self.subTest(msg="Intersection"):
             self.assertEqual(self.metric.intersection, torch.tensor(0, dtype=torch.int))
         with self.subTest(msg="Union"):
@@ -572,7 +593,7 @@ class TestAJI(unittest.TestCase):
                                 [1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 1, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool)
-        aji = self.metric(pred, target)
+        aji = self.metric(pred, target)["AJI"]
         with self.subTest(msg="Intersection"):
             self.assertEqual(self.metric.intersection, torch.tensor(9, dtype=torch.int))
         with self.subTest(msg="Union"):
@@ -580,7 +601,7 @@ class TestAJI(unittest.TestCase):
         with self.subTest(msg="False Positives"):
             self.assertEqual(self.metric.false_positives, torch.tensor(5, dtype=torch.int))
         with self.subTest(msg="AJI"):
-            self.assertEqual(aji, torch.tensor(9/33, dtype=torch.float))
+            self.assertEqual(aji, torch.tensor(9 / 33, dtype=torch.float))
 
     def test_2(self):
         pred = torch.tensor([[[1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
@@ -626,7 +647,7 @@ class TestAJI(unittest.TestCase):
                                 [1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 1, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool)
-        aji = self.metric(pred, target)
+        aji = self.metric(pred, target)["AJI"]
         with self.subTest(msg="Intersection"):
             self.assertEqual(self.metric.intersection, torch.tensor(11, dtype=torch.int))
         with self.subTest(msg="Union"):
@@ -691,7 +712,7 @@ class TestAJI(unittest.TestCase):
                                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool)
-        aji = self.metric(pred, target)
+        aji = self.metric(pred, target)["AJI"]
         with self.subTest(msg="Intersection"):
             self.assertEqual(self.metric.intersection, torch.tensor(9, dtype=torch.int))
         with self.subTest(msg="Union"):
@@ -735,7 +756,7 @@ class TestAJI(unittest.TestCase):
                                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool)
 
-        aji = self.metric(pred, target)
+        aji = self.metric(pred, target)["AJI"]
         with self.subTest(msg="Intersection"):
             self.assertEqual(self.metric.intersection, torch.tensor(6, dtype=torch.int))
         with self.subTest(msg="Union"):
@@ -823,7 +844,7 @@ class TestAJI(unittest.TestCase):
                                  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                                  [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool))
 
-        aji = self.metric(pred, target)
+        aji = self.metric(pred, target)["AJI"]
         with self.subTest(msg="Intersection"):
             self.assertEqual(self.metric.intersection, torch.tensor(29, dtype=torch.int))
         with self.subTest(msg="Union"):
@@ -854,7 +875,7 @@ class TestAJI(unittest.TestCase):
                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                               [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]],dtype=torch.bool)
+                              [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool)
 
         target = torch.tensor([[[1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
@@ -877,7 +898,7 @@ class TestAJI(unittest.TestCase):
                                 [1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 1, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool)
-        aji = self.metric(pred, target)
+        aji = self.metric(pred, target)["AJI"]
         with self.subTest(msg="Intersection"):
             self.assertEqual(self.metric.intersection, torch.tensor(9, dtype=torch.int))
         with self.subTest(msg="Union"):
@@ -910,7 +931,7 @@ class TestAJI(unittest.TestCase):
                                 [1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
                                 [1, 1, 1, 1, 0, 0, 0, 0, 0, 0]]], dtype=torch.bool)
 
-        aji = self.metric(target, target)
+        aji = self.metric(target, target)["AJI"]
         with self.subTest(msg="Intersection"):
             self.assertEqual(self.metric.intersection, torch.tensor(19, dtype=torch.int))
         with self.subTest(msg="Union"):
@@ -923,7 +944,7 @@ class TestAJI(unittest.TestCase):
     def test_return_type(self):
         pred = torch.tensor([[[1], [1]], [[0], [1]]], dtype=torch.bool)
         target = torch.tensor([[[1], [0]], [[0], [1]]], dtype=torch.bool)
-        aji = self.metric(pred, target)
+        aji = self.metric(pred, target)["AJI"]
         with self.subTest(msg="Intersection"):
             self.assertEqual(self.metric.intersection, torch.tensor(2, dtype=torch.int))
         with self.subTest(msg="Union"):
@@ -931,10 +952,22 @@ class TestAJI(unittest.TestCase):
         with self.subTest(msg="False Positives"):
             self.assertEqual(self.metric.false_positives, torch.tensor(0, dtype=torch.int))
         with self.subTest(msg="AJI"):
-            self.assertEqual(aji, torch.tensor(2/3, dtype=torch.float))
+            self.assertEqual(aji, torch.tensor(2 / 3, dtype=torch.float))
         with self.subTest(msg="AJI type"):
             self.assertIsInstance(aji, torch.Tensor)
 
+    def test_empty(self):
+        pred = torch.tensor(data=(), dtype=torch.bool)
+        target = torch.tensor([[[1], [0]], [[0], [1]]], dtype=torch.bool)
+        aji = self.metric(pred, target)["AJI"]
+        with self.subTest(msg="Intersection"):
+            self.assertEqual(self.metric.intersection, torch.tensor(0, dtype=torch.int))
+        with self.subTest(msg="Union"):
+            self.assertEqual(self.metric.union, torch.tensor(2, dtype=torch.int))
+        with self.subTest(msg="False Positives"):
+            self.assertEqual(self.metric.false_positives, torch.tensor(0, dtype=torch.int))
+        with self.subTest(msg="AJI"):
+            self.assertEqual(aji, torch.tensor(0, dtype=torch.float))
 
 if __name__ == '__main__':
     unittest.main()
