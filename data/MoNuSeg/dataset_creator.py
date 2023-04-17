@@ -1,10 +1,11 @@
-import numpy as np
 from pathlib import Path
 from typing import NoReturn
+
+import numpy as np
 from tqdm import tqdm
 
-from data.MoNuSeg.utils import comp_dirs
 from data.MoNuSeg.ground_truth import NucleiInstances
+from data.MoNuSeg.utils import comp_dirs
 
 
 class MoNuSegCreator:
@@ -64,7 +65,7 @@ class MoNuSegCreator:
         """
         save_dir = Path(self.base_dir, truth_type)
         save_dir.mkdir(exist_ok=True)
-        labels = comp_dirs(self.label_dir, save_dir)
+        labels = comp_dirs(self.label_dir, save_dir, file_suffix=".xml")
         print(f'Generating: {truth_type}')
         pbar = tqdm(labels)
         for label in pbar:

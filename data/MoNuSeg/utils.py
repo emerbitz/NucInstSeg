@@ -1,15 +1,16 @@
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Type, Union
+
 import torch
 from torch import Tensor
 from torch.utils.data._utils.collate import default_collate, collate, default_collate_fn_map
 
 
-def comp_dirs(dir: Path, comp_dir: Path) -> List[Path]:
-    """Returns the files that are in dir but not in comp_dir."""
+def comp_dirs(dir: Path, comp_dir: Path, file_suffix: str) -> List[Path]:
+    """Returns the files that are in dir but not in comp_dir. Only files with matching file_suffix are considered."""
 
-    files = {f for f in dir.iterdir() if f.is_file()}
-    comp_files = {f.stem for f in comp_dir.iterdir() if f.is_file()}
+    files = {f for f in dir.iterdir() if f.is_file() and f.suffix == file_suffix}
+    comp_files = {f.stem for f in comp_dir.iterdir() if f.is_file() and f.suffix == file_suffix}
     missing_files = []
     for file in files:
         if file.stem not in comp_files:
