@@ -1,7 +1,7 @@
-import numpy as np
-from typing import Any, List, NoReturn, Tuple, Union
 from pathlib import Path
+from typing import Any, List, NoReturn, Union
 
+import numpy as np
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
@@ -69,7 +69,7 @@ class MoNuSeg(Dataset):
                    "TCGA-ZF-A9R5-01A-01-TS1"]
 
     def __init__(self, root: str = "datasets", segmentation_masks: bool = True, contour_masks: bool = True,
-                 distance_maps: bool = True, instances: bool = False, labels: bool = False, transforms=None,
+                 distance_maps: bool = True, instances: bool = True, labels: bool = False, transforms=None,
                  dataset: Union[List[str], str] = "Whole", size: str = "Original") -> NoReturn:
         self.segmentation_mask = segmentation_masks
         self.contour_mask = contour_masks
