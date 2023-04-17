@@ -1,15 +1,17 @@
-import numpy as np
 from pathlib import Path
 from typing import List
 from xml.dom import minidom
-import torch
-from torch import Tensor
 
+import numpy as np
+import torch
+from scipy.ndimage import distance_transform_cdt
 from skimage.draw import polygon2mask
 from skimage.segmentation import find_boundaries, flood
+from torch import Tensor
 
 
 class NucleiInstances:
+
     def __init__(self, nuclei_instances: List[np.ndarray]) -> None:
         self.nuc_inst = nuclei_instances
 
@@ -28,7 +30,6 @@ class NucleiInstances:
         """Converts the nuclei instances as List[np.ndarray] into a torch.Tensor of shape (#nuclei, H, W)"""
         array = np.array(self.nuc_inst)
         return torch.from_numpy(array)
-
 
     @staticmethod
     def from_MoNuSeg(label: Path) -> "NucleiInstances":
@@ -72,7 +73,8 @@ class NucleiInstances:
         mask_shape = self.nuc_inst[0].shape
         mask = np.zeros(shape=mask_shape, dtype=bool)
         for inst in self.nuc_inst:
-            mask = np.logical_or(mask, inst)
+            mask *= inst
+            # mask = np.logical_or(mask, inst)
         return mask.astype(float)
 
     def to_cont_mask(self) -> np.ndarray:
@@ -90,7 +92,8 @@ class NucleiInstances:
                 background=False
             )  # Connectivity=1: 4-connected neighborhood, Connectivity=2: 8-connected neighborhood
             # Find_boundaries(mode="tick") = find_boundaries(mode="inner") logical_or find_boundaries(mode="outer")
-            mask = np.logical_or(mask, contours)
+            mask += contours
+            # mask = np.logical_or(mask, contours)
         return mask.astype(float)
 
     def to_dist_map(self) -> np.ndarray:
@@ -98,31 +101,14 @@ class NucleiInstances:
         Generates a distance map from the nuclei instances
         """
 
-        mask = self.to_seg_mask()
-        map = np.zeros(mask.shape, dtype=float)
-        for y in range(map.shape[0]):
-            for x in range(map.shape[1]):
-                map[y, x] = NucleiInstances.background_dist((y, x), mask)
+        map_shape = self.nuc_inst[0].shape
+        map = np.zeros(shape=map_shape, dtype=float)
+        for inst in self.nuc_inst:
+            dist = distance_transform_cdt(inst, metric="chessboard")
+            # if map[inst].any():  # Checks for overlap with another nucleus
+            #     [inst] = np.mean((map[inst], dist[inst]), axis=2)
+            #     # map[inst] = (map[inst] + dist[inst]) / 2
+            # else:
+            #     map += dist
+            map[inst] = dist[inst]
         return map
-
-    @staticmethod
-    def background_dist(pixel: tuple, mask: np.ndarray) -> int:
-        """
-        Calculates the chessboard distance of a pixel to the nearest background pixel
-        """
-
-        if not mask[pixel]:  # Trivial case: Pixel belongs to the background
-            dist = 0
-        else:  # Nontrivial case: Pixel does not belong to the background
-            dist = 1
-            calculating_dist = True
-            while calculating_dist is True:
-                y_low = max(0, pixel[0] - dist)
-                y_up = min(mask.shape[0], pixel[0] + dist + 1)
-                x_low = max(0, pixel[1] - dist)
-                x_up = min(mask.shape[1], pixel[1] + dist + 1)
-                if False in mask[y_low:y_up, x_low:x_up]:
-                    calculating_dist = False
-                else:
-                    dist += 1
-        return dist
