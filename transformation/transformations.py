@@ -35,7 +35,7 @@ class Resize(Transformation):
 class Split(Transformation):
     """Splits the image into smaller pieces of given size."""
 
-    def __init__(self, size: Union[Tuple[int, int], int]) -> NoReturn:
+    def __init__(self, size: Union[Tuple[int, int], int]):
         if not isinstance(size, (tuple, int)):
             raise TypeError(f"Size should be of type tuple or int. Got instead '{type(size)}'.")
         if isinstance(size, tuple) and len(size) != 2:
