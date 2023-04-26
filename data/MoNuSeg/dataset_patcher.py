@@ -12,7 +12,7 @@ class MoNuSegPatcher:
 
     def __init__(self, dataset: MoNuSeg):
         self.data = dataset
-        self.data.labels = True  # Required to save splits
+        self.data.labels = True  # Required to save patches
 
         self.dirs = [self.data.img_dir]
         if self.data.segmentation_mask:
@@ -21,6 +21,8 @@ class MoNuSegPatcher:
             self.dirs.append(self.data.cont_mask_dir)
         if self.data.distance_map:
             self.dirs.append(self.data.dist_map_dir)
+        if self.data.hv_distance_map:
+            self.dirs.append(self.data.hv_map_dir)
         if self.data.instances:
             self.dirs.append(self.data.inst_dir)
 

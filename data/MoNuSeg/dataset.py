@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, List, NoReturn, Union
+from typing import Any, List, Union
 
 import numpy as np
 import torch
@@ -69,11 +69,13 @@ class MoNuSeg(Dataset):
                    "TCGA-ZF-A9R5-01A-01-TS1"]
 
     def __init__(self, root: str = "datasets", segmentation_masks: bool = True, contour_masks: bool = True,
-                 distance_maps: bool = True, instances: bool = True, labels: bool = False, transforms=None,
-                 dataset: Union[List[str], str] = "Whole", size: str = "Original") -> NoReturn:
+                 distance_maps: bool = True, hv_distance_maps: bool = True, instances: bool = True,
+                 labels: bool = False, transforms=None, dataset: Union[List[str], str] = "Whole",
+                 size: str = "Original"):
         self.segmentation_mask = segmentation_masks
         self.contour_mask = contour_masks
         self.distance_map = distance_maps
+        self.hv_distance_map = hv_distance_maps
         self.instances = instances
         self.labels = labels
         self.transforms = transforms
@@ -84,6 +86,7 @@ class MoNuSeg(Dataset):
         self.seg_mask_dir = Path(base_dir, "Segmentation masks")
         self.cont_mask_dir = Path(base_dir, "Contour masks")
         self.dist_map_dir = Path(base_dir, "Distance maps")
+        self.hv_map_dir = Path(base_dir, "HV distance maps")
 
         if isinstance(dataset, str):
             data = self.select_data(dataset)
@@ -117,10 +120,8 @@ class MoNuSeg(Dataset):
 
         if self.transforms is not None:
             output = self.transforms(output)
-
         if self.labels:
             output.append(file)
-
         return output
 
     def __len__(self) -> int:
@@ -150,7 +151,8 @@ class MoNuSeg(Dataset):
         elif dataset == "Surplus":
             data = MoNuSeg.surplus
         else:
-            raise ValueError(f"Dataset should be of value 'Train Kaggle', 'Test Kaggle', Train', 'Test', 'Surplus', 'Whole'. Got instead {dataset}.")
+            raise ValueError(f"Dataset should be of value 'Train Kaggle', 'Test Kaggle', Train', 'Test', 'Surplus' or "
+                             f"'Whole'. Got instead {dataset}.")
         return data
 
     def _get_item_original(self, file: str, output: list) -> List[Any]:
@@ -171,6 +173,10 @@ class MoNuSeg(Dataset):
             dist_map_file = Path(self.dist_map_dir, file + ".npy")
             dist_map = np.load(str(dist_map_file))
             output.append(dist_map)
+        if self.hv_distance_map:
+            hv_map_file = Path(self.hv_map_dir, file + ".npy")
+            hv_map = np.load(str(hv_map_file))
+            output.append(hv_map)
         if self.instances:
             inst_file = Path(self.inst_dir, file + ".xml")
             inst = NucleiInstances.from_MoNuSeg(inst_file).as_ndarray()
@@ -196,6 +202,10 @@ class MoNuSeg(Dataset):
             dist_map_file = Path(self.dist_map_dir, file + ".pt")
             dist_map = torch.load(dist_map_file)
             output.append(dist_map)
+        if self.hv_distance_map:
+            hv_map_file = Path(self.hv_map_dir, file + ".pt")
+            hv_map = torch.load(hv_map_file)
+            output.append(hv_map)
         if self.instances:
             inst_file = Path(self.inst_dir, file + ".pt")
             inst = torch.load(inst_file)

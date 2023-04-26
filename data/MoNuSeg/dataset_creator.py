@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import NoReturn
 
 import numpy as np
 from tqdm import tqdm
@@ -13,13 +12,13 @@ class MoNuSegCreator:
     Prepares the MoNuSeg dataset prior to usage
     """
 
-    def __init__(self, root: str = "datasets", ) -> NoReturn:
+    def __init__(self, root: str = "datasets", ):
         self.base_dir = Path(root, "MoNuSeg 2018")
         # self.img_dir = Path(self.base_dir, "Tissue Images")
         self.label_dir = Path(self.base_dir, "Annotations")
 
     def save_ground_truths(self, segmentation_masks: bool = True, contour_masks: bool = True,
-                           distance_maps: bool = True) -> NoReturn:
+                           distance_maps: bool = True, hv_distance_maps: bool=True) -> None:
         """
         Generates and saves the ground truths of the specified types if the ground truths do not exist
         """
@@ -31,37 +30,47 @@ class MoNuSegCreator:
             self.save_truth_type("Contour masks")
         if distance_maps:
             self.save_truth_type("Distance maps")
+        if hv_distance_maps:
+            self.save_truth_type("HV distance maps")
 
     @staticmethod
-    def make_seg_mask(label: Path) -> np.array:
+    def make_seg_mask(label: Path) -> np.ndarray:
         """
-        Retrieves the segmentation mask from the specified label
+        Generates the segmentation mask for the specified label
         """
         instances = NucleiInstances.from_MoNuSeg(label)
         return instances.to_seg_mask()
 
     @staticmethod
-    def make_cont_mask(label: Path) -> np.array:
+    def make_cont_mask(label: Path) -> np.ndarray:
         """
-        Retrieves the contour mask from the specified label
+        Generates the contour mask for the specified label
         """
         instances = NucleiInstances.from_MoNuSeg(label)
         return instances.to_cont_mask()
 
     @staticmethod
-    def make_dist_map(label: Path) -> np.array:
+    def make_dist_map(label: Path) -> np.ndarray:
         """
-        Retrieves the distance map from the specified label
+        Generates the distance map for the specified label
         """
         instances = NucleiInstances.from_MoNuSeg(label)
         return instances.to_dist_map()
 
-    def save_truth_type(self, truth_type: str) -> NoReturn:
+    @staticmethod
+    def make_hv_map(label: Path) -> np.ndarray:
         """
-        Generates and saves the ground truths of the specified type if the ground truths do not exist
+        Generates the distance map for the specified label
+        """
+        instances = NucleiInstances.from_MoNuSeg(label)
+        return instances.to_hv_map()
+
+    def save_truth_type(self, truth_type: str) -> None:
+        """
+        Generates and saves the ground truths of the specified type if the ground truths do not exist.
 
         Parameters:
-          truth_type: "Segmentation masks", "Contour masks" or "Distance maps"
+          truth_type: "Segmentation masks", "Contour masks", "Distance maps" or "HV distance maps"
         """
         save_dir = Path(self.base_dir, truth_type)
         save_dir.mkdir(exist_ok=True)
@@ -77,9 +86,11 @@ class MoNuSegCreator:
                 truth = instances.to_cont_mask()
             elif truth_type == "Distance maps":
                 truth = instances.to_dist_map()
+            elif truth_type == "HV distance maps":
+                truth = instances.to_hv_map()
             else:
                 raise ValueError(
-                    "Parameter truth_type must be 'Segmentation masks', 'Contour masks' or 'Distance maps'. Got {"
-                    "truth_type} instead.")
+                    f"Truth type must be 'Segmentation masks', 'Contour masks', 'Distance maps' or 'HV distance maps'. "
+                    f"Got instead {truth_type}.")
             save_path = Path(save_dir, label.stem + ".npy")
             np.save(str(save_path), truth)

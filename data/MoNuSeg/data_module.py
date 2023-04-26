@@ -17,8 +17,9 @@ class MoNuSegDataModule(pl.LightningDataModule):
     Performs splitting and batching into train, validation and test for the MoNuSeg dataset
     """
 
-    def __init__(self, seg_masks: bool = True, cont_masks: bool = True, dist_maps: bool = True, labels: bool = False,
-                 data_root: str = "datasets", batch_size: int = 8, img_size: Tuple[int, int] = (256, 256),
+    def __init__(self, seg_masks: bool = True, cont_masks: bool = True, dist_maps: bool = True, hv_maps: bool = True,
+                 labels: bool = False, data_root: str = "datasets", batch_size: int = 8,
+                 img_size: Tuple[int, int] = (256, 256),
                  train_transforms=Combine([RandHorizontalFlip(p=0.5),
                                            RandVerticalFlip(p=0.5),
                                            RandRotate(degrees=360.)]),
@@ -30,6 +31,7 @@ class MoNuSegDataModule(pl.LightningDataModule):
         self.seg_masks = seg_masks
         self.cont_masks = cont_masks
         self.dist_maps = dist_maps
+        self.hv_maps = hv_maps
         self.labels = labels
         self.root = data_root
 
@@ -50,21 +52,23 @@ class MoNuSegDataModule(pl.LightningDataModule):
         creator.save_ground_truths(
             segmentation_masks=self.seg_masks,
             contour_masks=self.cont_masks,
-            distance_maps=self.dist_maps
+            distance_maps=self.dist_maps,
+            hv_distance_maps=self.hv_maps
         )
         # To do: Check for file existence
-        # patcher = MoNuSegPatcher(
-        #     dataset=MoNuSeg(
-        #         root=self.root,
-        #         segmentation_masks=self.seg_masks,
-        #         contour_masks=self.cont_masks,
-        #         distance_maps=self.dist_maps,
-        #         instances=True,
-        #         transforms=ToTensor(),
-        #         dataset="Train Kaggle"
-        #     )
-        # )
-        # patcher.split_and_save(patch_size=self.img_size)
+        patcher = MoNuSegPatcher(
+            dataset=MoNuSeg(
+                root=self.root,
+                segmentation_masks=self.seg_masks,
+                contour_masks=self.cont_masks,
+                distance_maps=self.dist_maps,
+                hv_distance_maps=self.hv_maps,
+                instances=True,
+                transforms=ToTensor(),
+                dataset="Train Kaggle"
+            )
+        )
+        patcher.split_and_save(patch_size=self.img_size)
 
     def setup(self, stage: str = None) -> None:
         if stage == "fit" or stage is None:
@@ -78,8 +82,9 @@ class MoNuSegDataModule(pl.LightningDataModule):
                 segmentation_masks=self.seg_masks,
                 contour_masks=self.cont_masks,
                 distance_maps=self.dist_maps,
+                hv_distance_maps= self.hv_maps,
                 labels=self.labels,
-                instances=False,
+                instances=True,
                 dataset=train_dataset,
                 transforms=self.train_transforms,
                 size="256"
@@ -89,6 +94,7 @@ class MoNuSegDataModule(pl.LightningDataModule):
                 segmentation_masks=self.seg_masks,
                 contour_masks=self.cont_masks,
                 distance_maps=self.dist_maps,
+                hv_distance_maps=self.hv_maps,
                 labels=self.labels,
                 instances=True,
                 dataset=val_dataset,
@@ -102,6 +108,7 @@ class MoNuSegDataModule(pl.LightningDataModule):
                 segmentation_masks=self.seg_masks,
                 contour_masks=self.cont_masks,
                 distance_maps=self.dist_maps,
+                hv_distance_maps=self.hv_maps,
                 labels=self.labels,
                 instances=True,
                 dataset="Test",
