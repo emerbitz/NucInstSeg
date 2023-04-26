@@ -10,7 +10,7 @@ def main():
     pl.seed_everything(42, workers=True)  # Seed for torch, numpy and python.random
     net = ALNet(up_mode="nearest")
     model = ALNetModel(net)
-    data_module = MoNuSegDataModule(seg_masks=True, cont_masks=True, dist_maps=False)
+    data_module = MoNuSegDataModule(seg_masks=True, cont_masks=True, dist_maps=False, hv_maps=False)
     logger = pl.loggers.TensorBoardLogger(save_dir=".", default_hp_metric=False)
     # Alternative: SimpleProfiler(), AdvancedProfiler(), XLAProfiler()
     profiler = SimpleProfiler(dirpath="performance_logs", filename="summary")
