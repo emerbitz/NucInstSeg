@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Type, Union
-
+import numpy as np
 import torch
 from torch import Tensor
 from torch.utils.data._utils.collate import default_collate, collate, default_collate_fn_map
@@ -53,3 +53,16 @@ def custom_collate(batch):
     varying tensor shapes."""
     default_collate_fn_map.update({Tensor: collate_tensor_fn})
     return collate(batch, collate_fn_map=default_collate_fn_map)
+
+
+def get_bbox(instance: np.ndarray) -> Tuple[int, int, int, int]:
+    """Determines the bounding box (bbox) for the instance. The bbox coordinates are designed for indexing."""
+    rows = np.any(instance, axis=1)
+    cols = np.any(instance, axis=0)
+    y = np.nonzero(rows)[0]
+    x = np.nonzero(cols)[0]
+    # print(y)
+    # print(instance.any())
+    y_min, y_max = y[0], y[-1]+1  # Designed for indexing -> +1
+    x_min, x_max = x[0], x[-1]+1  # Designed for indexing -> +1
+    return y_min, y_max, x_min, x_max
