@@ -34,7 +34,7 @@ class ALNetModel(pl.LightningModule):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
 
     def training_step(self, train_batch, batch_idx):
-        imgs, seg_masks, cont_masks = train_batch
+        imgs, seg_masks, cont_masks, _ = train_batch
         seg, cont = self.forward(imgs)
         loss = self.lambda_main * self.loss_main(seg, seg_masks) + self.lambda_aux * self.loss_aux(cont, cont_masks)
 
