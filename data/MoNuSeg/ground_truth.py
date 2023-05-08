@@ -121,10 +121,10 @@ class NucleiInstances:
         """
         Extracts nuclei instances from a map of labeled instances.
 
-        Premiss: Labels are continuous (e.g. [0, 1, 2, 3] and not [0, 1, 3])
+        Premiss: Labels are continuous (e.g. [0, 1, 2, 3] and not [0, 1, 3]).
         """
         nuclei = []
-        for l in range(1, labeled_inst.max()+1):
+        for l in range(1, labeled_inst.max()+1):  # 0 is background
             nucleus = labeled_inst == l
             nuclei.append(nucleus)
         return NucleiInstances(nuclei)
