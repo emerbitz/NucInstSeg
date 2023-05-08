@@ -120,11 +120,12 @@ class NucleiInstances:
     def from_labeled_inst(labeled_inst: np.ndarray) -> "NucleiInstances":
         """
         Extracts nuclei instances from a map of labeled instances.
+
+        Premiss: Labels are continuous (e.g. [0, 1, 2, 3] and not [0, 1, 3])
         """
         nuclei = []
-        for l in range(1, labeled_inst.max()):
-            nucleus = np.zeros(labeled_inst.shape, dtype=bool)
-            nucleus[labeled_inst == l] = True
+        for l in range(1, labeled_inst.max()+1):
+            nucleus = labeled_inst == l
             nuclei.append(nucleus)
         return NucleiInstances(nuclei)
 
