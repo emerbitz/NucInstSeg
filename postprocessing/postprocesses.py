@@ -2,6 +2,7 @@ from typing import Optional, Tuple, Union
 from torch import Tensor
 
 from postprocessing.postprocesses_base import Postprocess
+from data.MoNuSeg.ground_truth import NucleiInstances
 
 
 class SegPostProcess(Postprocess):
