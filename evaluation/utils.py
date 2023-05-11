@@ -36,4 +36,4 @@ def tensor_union(a: Tensor, b: Tensor) -> Tensor:
 
 def intersection_over_union(a: Tensor, b: Tensor) -> Tensor:
     """Calculates the Intersection over Union (IoU)"""
-    return tensor_intersection(a, b) / tensor_union(a, b)
+    return tensor_intersection(a, b) / tensor_union(a, b)  # Maybe add 1e-6 to the denominator to avoid zero division
