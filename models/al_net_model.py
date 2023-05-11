@@ -4,7 +4,7 @@ from torch import Tensor
 import torch.nn as nn
 
 from data.MoNuSeg.illustrator import Picture
-from postprocessing.segmentation import InstanceExtractor
+from postprocessing.postprocesses import SegPostProcess
 from evaluation.metrics import PQ, AJI
 
 from transformation.transformations import PadZeros
@@ -49,7 +49,7 @@ class ALNetModel(pl.LightningModule):
         loss = self.lambda_main * self.loss_main(seg, seg_masks) + self.lambda_aux * self.loss_aux(cont, cont_masks)
 
         seg_log, cont_log = torch.sigmoid(seg), torch.sigmoid(cont)
-        pred_instances = InstanceExtractor(seg=seg_log, cont=cont_log).get_instances(impl="skimage")
+        pred_instances = SegPostProcess()(seg=seg_log, cont=cont_log)
         if batch_idx == 0 and self.current_epoch % 2 == 0:
             Picture.from_tensor((seg_log[0] > 0.5).cpu()).save("seg_log_" + str(self.current_epoch))
             # self.log("seg_log" + str(self.current_epoch), seg_log[0, 0] > 0.5)
