@@ -1,17 +1,54 @@
-from typing import Optional, Dict, Union, Any
-from scipy.optimize import linear_sum_assignment
-import numpy as np
+from typing import Optional, Dict
+
 import torch
+from scipy.optimize import linear_sum_assignment
 from torch import Tensor
 from torchmetrics import Metric
 
-from evaluation.utils import tensor_intersection, intersection_over_union, tensor_union, is_empty
 from evaluation.metrics_base import Score
+from evaluation.utils import tensor_intersection, tensor_union, is_empty
+
+
+# class PQ_v0(Score, Metric):
+#     """Implementation of the Panoptic Quality (PQ) using torchmetrics. PQ is the product of the Detection Quality (DQ)
+#     (i.e., the F1-Score) and the Segmentation Quality (SQ). See Kirillov et al. 2019 for more details."""
+#
+#     is_differentiable: Optional[bool] = False
+#     higher_is_better: Optional[bool] = True
+#     full_state_update: bool = False
+#
+#     def __init__(self):
+#         super().__init__()
+#         self.add_state("TP", default=torch.tensor(0, dtype=torch.int), dist_reduce_fx="sum", persistent=False)
+#         self.add_state("FN", default=torch.tensor(0, dtype=torch.int), dist_reduce_fx="sum", persistent=False)
+#         self.add_state("FP", default=torch.tensor(0, dtype=torch.int), dist_reduce_fx="sum", persistent=False)
+#         self.add_state("IoU", default=torch.tensor(0, dtype=torch.float), dist_reduce_fx="sum", persistent=False)
+#
+#     def evaluate(self, pred_inst: Tensor, gt_inst: Tensor) -> None:
+#         """Updates the states TP, FN, FP and IoU."""
+#         TP = torch.tensor(0, dtype=torch.int)
+#         for inst in gt_inst:
+#             for pred in pred_inst:
+#                 iou = intersection_over_union(pred, inst)
+#                 if iou > 0.5:  # IoU > 0.5 implies a unique match
+#                     self.IoU += iou
+#                     TP += 1
+#         self.TP += TP  # Detected nuclei
+#         self.FN += len(gt_inst) - TP  # Undetected nuclei
+#         self.FP += len(pred_inst) - TP  # Detected non-existing nuclei
+#
+#     def compute(self) -> Dict[str, Tensor]:
+#         """Computes the Detection Quality (DQ), the Segmentation Quality (SQ) and the Panoptic Quality (PQ)."""
+#         dq = 2 * self.TP / (2 * self.TP + self.FN + self.FP)
+#         sq = self.IoU / self.TP
+#         return {"DQ": dq, "SQ": sq, "PQ": dq * sq}
 
 
 class PQ(Score, Metric):
-    """Implementation of the Panoptic Quality (PQ) using torchmetrics. PQ is the product of the Detection Quality (DQ)
-    (i.e., the F1-Score) and the Segmentation Quality (SQ). See Kirillov et al. 2019 for more details."""
+    """Implementation of the Panoptic Quality (PQ).
+
+    PQ is defined as the product of the Detection Quality (DQ) (i.e., the F1-Score) and the Segmentation Quality (SQ).
+    See Kirillov et al. 2019 for more details."""
 
     is_differentiable: Optional[bool] = False
     higher_is_better: Optional[bool] = True
@@ -26,16 +63,22 @@ class PQ(Score, Metric):
 
     def evaluate(self, pred_inst: Tensor, gt_inst: Tensor) -> None:
         """Updates the states TP, FN, FP and IoU."""
-        TP = torch.tensor(0, dtype=torch.int)
-        for inst in gt_inst:
-            for pred in pred_inst:
-                iou = intersection_over_union(pred, inst)
-                if iou > 0.5:  # IoU > 0.5 implies a unique match
-                    self.IoU += iou
-                    TP += 1
+        device = pred_inst.device
+        num_pred = pred_inst.shape[0]
+        num_gt = gt_inst.shape[0]
+        pairwise_inter = torch.zeros((num_pred, num_gt), dtype=torch.int, device=device)
+        pairwise_union = torch.zeros((num_pred, num_gt), dtype=torch.int, device=device)
+        for col, gt in enumerate(gt_inst):
+            for row, pred in enumerate(pred_inst):
+                pairwise_inter[row, col] = tensor_intersection(pred, gt)
+                pairwise_union[row, col] = tensor_union(pred, gt)
+        iou = pairwise_inter / pairwise_union
+        pairs = iou > 0.5
+        self.IoU += torch.sum(iou[pairs])
+        TP = torch.sum(pairs)
         self.TP += TP  # Detected nuclei
-        self.FN += len(gt_inst) - TP  # Undetected nuclei
-        self.FP += len(pred_inst) - TP  # Detected non-existing nuclei
+        self.FN += num_gt - TP  # Undetected nuclei
+        self.FP += num_pred - TP  # Detected non-existing nuclei
 
     def compute(self) -> Dict[str, Tensor]:
         """Computes the Detection Quality (DQ), the Segmentation Quality (SQ) and the Panoptic Quality (PQ)."""
@@ -192,12 +235,12 @@ class AJI(Score, Metric):
             num_gt = gt_inst.shape[0]
             pairwise_inter = torch.zeros((num_pred, num_gt), dtype=torch.int, device=device)
             pairwise_union = torch.zeros((num_pred, num_gt), dtype=torch.int, device=device)
-            for col, inst in enumerate(gt_inst):
+            for col, gt in enumerate(gt_inst):
                 for row, pred in enumerate(pred_inst):
-                    pairwise_inter[row, col] = tensor_intersection(pred, inst)
-                    pairwise_union[row, col] = tensor_union(pred, inst)
+                    pairwise_inter[row, col] = tensor_intersection(pred, gt)
+                    pairwise_union[row, col] = tensor_union(pred, gt)
 
-            iou = pairwise_inter / (pairwise_union + 1e-6)  # Avoid zero division
+            iou = pairwise_inter / pairwise_union
             row_idx = torch.argmax(iou, dim=0)
             col_idx = torch.arange(0, num_gt, dtype=torch.long)
             self.intersection += pairwise_inter[row_idx, col_idx].sum()
@@ -244,12 +287,12 @@ class ModAJI(Score, Metric):
             num_gt = gt_inst.shape[0]
             pairwise_inter = torch.zeros((num_pred, num_gt), dtype=torch.int, device=device)
             pairwise_union = torch.zeros((num_pred, num_gt), dtype=torch.int, device=device)
-            for col, inst in enumerate(gt_inst):
+            for col, gt in enumerate(gt_inst):
                 for row, pred in enumerate(pred_inst):
-                    pairwise_inter[row, col] = tensor_intersection(pred, inst)
-                    pairwise_union[row, col] = tensor_union(pred, inst)
+                    pairwise_inter[row, col] = tensor_intersection(pred, gt)
+                    pairwise_union[row, col] = tensor_union(pred, gt)
 
-            iou = pairwise_inter / (pairwise_union + 1e-6)  # Avoid zero division
+            iou = pairwise_inter / pairwise_union
             # Optimization using a modified Jonker-Volgenant algorithm:
             row_ind, col_ind = linear_sum_assignment(-iou.cpu())  # Negate IoU values as algo searches for minimum
             self.intersection += pairwise_inter[row_ind, col_ind].sum()
@@ -265,10 +308,7 @@ class ModAJI(Score, Metric):
         return {"AJI": self.intersection / self.union}
 
 if __name__ == "__main__":
-    from tqdm import tqdm
 
-    from data.MoNuSeg.dataset import MoNuSeg
-    from data.MoNuSeg.illustrator import Picture
     from data.MoNuSeg.data_module import MoNuSegDataModule
     from postprocessing.segmentation import InstanceExtractor
 
