@@ -1,9 +1,9 @@
 from typing import Optional, Dict
 
-from scipy.optimize import linear_sum_assignment
 import torch
-from torch import Tensor
 import torchmetrics
+from scipy.optimize import linear_sum_assignment
+from torch import Tensor
 from torchmetrics import Metric
 
 from evaluation.metrics_base import Score
@@ -11,7 +11,6 @@ from evaluation.utils import tensor_intersection, tensor_union, is_empty
 
 
 class DSC(Score, Metric):
-
     """
     Wrapper for the Dice score implementation of torchmetrics.
 
@@ -36,7 +35,7 @@ class DSC(Score, Metric):
         self.dice.update(preds=pred_mask, target=gt_mask)
 
     def compute(self) -> Dict[str, Tensor]:
-        print(f"TP: {self.dice.tp}, FP: {self.dice.fp}, FN: {self.dice.fn}")
+        # print(f"TP: {self.dice.tp}, FP: {self.dice.fp}, FN: {self.dice.fn}")
         return {"DSC": self.dice.compute()}
 
 # class PQ_v0(Score, Metric):
@@ -335,7 +334,7 @@ class ModAJI(Score, Metric):
 
     def compute(self) -> Dict[str, Tensor]:
         """Computes the modified Aggregated Jaccard Index (AJI)."""
-        return {"AJI": self.intersection / self.union}
+        return {"ModAJI": self.intersection / self.union}
 
 if __name__ == "__main__":
 
