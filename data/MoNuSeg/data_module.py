@@ -1,15 +1,14 @@
 import random
 from typing import Tuple
+
 import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader
 
+from augmentation.augmentations import RandHorizontalFlip, RandRotate, RandVerticalFlip
 from data.MoNuSeg.dataset import MoNuSeg
-from data.MoNuSeg.dataset_creator import MoNuSegCreator
-from data.MoNuSeg.dataset_patcher import MoNuSegPatcher
 from data.MoNuSeg.utils import custom_collate
-from augmentation.augmentations import RandCrop, RandHorizontalFlip, RandRotate, RandVerticalFlip
-from transformation.transformations import Combine, ToTensor, PadZeros
+from transformation.transformations import Combine
 
 
 class MoNuSegDataModule(pl.LightningDataModule):
@@ -48,27 +47,7 @@ class MoNuSegDataModule(pl.LightningDataModule):
         self.test_data: MoNuSeg
 
     def prepare_data(self) -> None:
-        creator = MoNuSegCreator(root=self.root)
-        creator.save_ground_truths(
-            segmentation_masks=self.seg_masks,
-            contour_masks=self.cont_masks,
-            distance_maps=self.dist_maps,
-            hv_distance_maps=self.hv_maps
-        )
-        # To do: Check for file existence
-        patcher = MoNuSegPatcher(
-            dataset=MoNuSeg(
-                root=self.root,
-                segmentation_masks=self.seg_masks,
-                contour_masks=self.cont_masks,
-                distance_maps=self.dist_maps,
-                hv_distance_maps=self.hv_maps,
-                instances=True,
-                transforms=ToTensor(),
-                dataset="Train Kaggle"
-            )
-        )
-        patcher.split_and_save(patch_size=self.img_size)
+        pass
 
     def setup(self, stage: str = None) -> None:
         if stage == "fit" or stage is None:
