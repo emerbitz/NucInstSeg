@@ -1,13 +1,43 @@
 from typing import Optional, Dict
 
-import torch
 from scipy.optimize import linear_sum_assignment
+import torch
 from torch import Tensor
+import torchmetrics
 from torchmetrics import Metric
 
 from evaluation.metrics_base import Score
 from evaluation.utils import tensor_intersection, tensor_union, is_empty
 
+
+class DSC(Score, Metric):
+
+    """
+    Wrapper for the Dice score implementation of torchmetrics.
+
+    See Dice 1945 for more information about the Dice score.
+    """
+
+    is_differentiable: Optional[bool] = False
+    higher_is_better: Optional[bool] = True
+    full_state_update: bool = False
+
+    def __init__(self, ignore_background: bool = True):
+        super().__init__()
+        if ignore_background:
+            ignore_idx = 0
+        else:
+            ignore_idx = None
+        self.dice = torchmetrics.Dice(threshold=None, ignore_index=ignore_idx)
+
+    def evaluate(self, pred_inst: Tensor, gt_inst: Tensor) -> None:
+        pred_mask = torch.any(pred_inst, dim=0)
+        gt_mask = torch.any(gt_inst, dim=0)
+        self.dice.update(preds=pred_mask, target=gt_mask)
+
+    def compute(self) -> Dict[str, Tensor]:
+        print(f"TP: {self.dice.tp}, FP: {self.dice.fp}, FN: {self.dice.fn}")
+        return {"DSC": self.dice.compute()}
 
 # class PQ_v0(Score, Metric):
 #     """Implementation of the Panoptic Quality (PQ) using torchmetrics. PQ is the product of the Detection Quality (DQ)
