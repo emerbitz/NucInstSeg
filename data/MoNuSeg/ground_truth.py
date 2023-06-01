@@ -18,7 +18,8 @@ class NucleiInstances:
 
     def __init__(self, nuclei_instances: List[np.ndarray]):
         self.nuc_inst = nuclei_instances
-        self.shape = nuclei_instances[0].shape  # Premise: All nuclei instances have the same shape
+        # Premise: All nuclei instances have the same shape
+        self.shape = (1000, 1000)  # Hard coded; adaption needed for other dataset
 
     def __len__(self) -> int:
         return len(self.nuc_inst)
@@ -157,7 +158,7 @@ class NucleiInstances:
         mask = np.zeros(shape=self.shape, dtype=bool)
         for inst in self.nuc_inst:
             mask += inst
-        return mask.astype(float)
+        return mask.astype(np.float32)
 
     def to_cont_mask(self) -> np.ndarray:
         """
@@ -174,7 +175,7 @@ class NucleiInstances:
             # Find_boundaries(mode="tick") = find_boundaries(mode="inner") logical_or find_boundaries(mode="outer")
             mask += contours
             # mask = np.logical_or(mask, contours)
-        return mask.astype(float)
+        return mask.astype(np.float32)
 
     def to_dist_map(self) -> np.ndarray:
         """
@@ -182,7 +183,7 @@ class NucleiInstances:
 
         Caution: Causes information loss if nuclei instances overlap!
         """
-        map = np.zeros(shape=self.shape, dtype=float)
+        map = np.zeros(shape=self.shape, dtype=np.float32)
         for inst in self.nuc_inst:
             dist = distance_transform_cdt(inst, metric="chessboard")
             # if map[inst].any():  # Checks for overlap with another nucleus
@@ -197,8 +198,8 @@ class NucleiInstances:
         """
         Generates a horizontal and a vertical distance map form the nuclei instances.
         """
-        h_map = np.zeros(shape=self.shape, dtype=float)
-        v_map = np.zeros(shape=self.shape, dtype=float)
+        h_map = np.zeros(shape=self.shape, dtype=np.float32)
+        v_map = np.zeros(shape=self.shape, dtype=np.float32)
         for inst in self.nuc_inst:
             # Determine bounding box (bbox) for the nucleus:
             y_min, y_max, x_min, x_max = get_bbox(inst)
