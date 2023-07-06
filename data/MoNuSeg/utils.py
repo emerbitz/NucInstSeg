@@ -1,7 +1,9 @@
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Type, Union
+
 import numpy as np
 import torch
+from skimage.filters import threshold_otsu
 from torch import Tensor
 from torch.utils.data._utils.collate import default_collate, collate, default_collate_fn_map
 
@@ -55,14 +57,71 @@ def custom_collate(batch):
     return collate(batch, collate_fn_map=default_collate_fn_map)
 
 
-def get_bbox(instance: np.ndarray) -> Tuple[int, int, int, int]:
+def get_bbox(instance: Union[np.ndarray, Tensor]) -> Tuple[int, int, int, int]:
     """Determines the bounding box (bbox) for the instance. The bbox coordinates are designed for indexing."""
-    rows = np.any(instance, axis=1)
-    cols = np.any(instance, axis=0)
-    y = np.nonzero(rows)[0]
-    x = np.nonzero(cols)[0]
-    # print(y)
-    # print(instance.any())
-    y_min, y_max = y[0], y[-1]+1  # Designed for indexing -> +1
-    x_min, x_max = x[0], x[-1]+1  # Designed for indexing -> +1
-    return y_min, y_max, x_min, x_max
+    if isinstance(instance, np.ndarray):
+        rows = instance.any(axis=1)
+        cols = instance.any(axis=0)
+        y = rows.nonzero()[0]
+        x = cols.nonzero()[0]
+        y_min, y_max = y[0], y[-1] + 1  # Designed for indexing -> +1
+        x_min, x_max = x[0], x[-1] + 1  # Designed for indexing -> +1
+        return y_min, y_max, x_min, x_max
+    elif isinstance(instance, Tensor):
+        rows = instance.any(dim=1)
+        cols = instance.any(dim=0)
+        y = rows.nonzero(as_tuple=True)[0]
+        x = cols.nonzero(as_tuple=True)[0]
+        y_min, y_max = int(y[0]), int(y[-1] + 1)  # Designed for indexing -> +1
+        x_min, x_max = int(x[0]), int(x[-1] + 1)  # Designed for indexing -> +1
+        return y_min, y_max, x_min, x_max
+    else:
+        raise TypeError(f"Instance should be of type np.ndarray or tensor. Got instead {type(instance)}")
+
+
+def center_of_mass(mask: Union[np.ndarray, Tensor]) -> Tuple[float, float]:
+    """
+    Calculates the center of mass for a binary mask.
+    """
+    if isinstance(mask, np.ndarray):
+        rows, cols = mask.nonzero()
+    elif isinstance(mask, Tensor):
+        rows, cols = mask.nonzero(as_tuple=True)
+    else:
+        raise TypeError(f"Instance should be of type np.ndarray or tensor. Got instead {type(mask)}")
+    y = rows.sum() / rows.shape[0]
+    x = cols.sum() / cols.shape[0]
+    return float(y), float(x)
+
+
+def prob_to_mask(prob: np.ndarray, thresh: Union[str, float] = 0.5) -> np.ndarray:
+    """
+    Converts probabilities into a binary mask.
+
+    Threshold value is either inferred using the Otsu method (Otsu 1979) or can be given as a float value.
+    """
+    # Check if conversion to mask is necessary:
+    if issubclass(prob.dtype.type, np.floating):
+        if isinstance(thresh, (str, float)):
+            if isinstance(thresh, str):
+                if thresh == "otsu":
+                    thresh = threshold_otsu(prob)
+                else:
+                    raise ValueError(f"Thresh as string should be 'otsu'. Got instead {thresh}.")
+            mask = prob >= thresh
+        else:
+            raise TypeError(f"Thresh should be string or float. Got instead {type(thresh)}.")
+    else:
+        mask = prob
+
+    return mask
+
+
+def cuda_tensor_to_ndarray(tensor: Tensor) -> np.ndarray:
+    """
+    Converts a tensor on cuda into a ndarray on the cpu.
+    """
+    tensor = tensor.cpu()
+    if tensor.requires_grad:
+        tensor = tensor.detach()
+    return tensor.squeeze().numpy()
