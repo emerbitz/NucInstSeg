@@ -1,30 +1,34 @@
-from typing import Optional, Tuple, Union
+from typing import Dict, Tuple, Union
+
+import torch
 from torch import Tensor
 
-from data.MoNuSeg.ground_truth import NucleiInstances
 from postprocessing.postprocesses_base import Postprocess
-from data.MoNuSeg.ground_truth import NucleiInstances
+
 
 class SegPostProcess(Postprocess):
     """
-    Postprocessing based on the segmentation mask and the contour mask.
+    Postprocessing based on the segmentation and the contour.
 
-    Nuclei instances are extracted by flooding. If a contour mask is provided, then the contour mask is subtracted from
-    the segmentation mask prior to flooding.
+    Nuclei instances are extracted by flooding. If a contour is provided, then the contour is subtracted from
+    the segmentation prior to flooding.
     """
-    def __init__(self):
-        pass
 
-    def __call__(self, seg: Tensor, cont: Optional[Tensor] = None) -> Union[Tensor, Tuple[Tensor, ...]]:
-        seg_mask = seg >= 0.5
-        if cont is not None:
-            cont_mask = cont >= 0.5
-        else:
-            cont_mask = cont
-        return self.postprocess(seg_mask, cont_mask)
+    def __init__(self, seg_thresh: Union[str, float] = 0.5, cont_thresh: Union[str, float] = 0.5):
+        self.seg_thresh = seg_thresh
+        self.cont_thresh = cont_thresh
 
-    def postprocess_fn(self, seg_mask: Tensor, cont_mask: Tensor = None) -> Tensor:
-        return NucleiInstances.from_mask(seg_mask, cont_mask).as_tensor()
+    def __call__(self, pred: Dict[str, Tensor]) -> Union[Tensor, Tuple[Tensor, ...]]:
+        seg = pred["seg_mask"]
+        cont = pred["cont_mask"]
+        if torch.is_floating_point(seg):
+            seg = torch.sigmoid(seg)
+        if torch.is_floating_point(cont):
+            cont = torch.sigmoid(cont)
+        return self.postprocess(seg, cont)
+
+    def postprocess_fn(self, seg: Tensor, cont: Tensor = None) -> Tensor:
+        return NucleiInstances.from_seg(seg, cont, self.seg_thresh, self.cont_thresh).as_tensor()
 
 
 class DistPostProcess(Postprocess):
@@ -33,15 +37,16 @@ class DistPostProcess(Postprocess):
 
     The postprocessing strategy by Naylor et al. 2019 is used to identify nuclei instances.
     """
+
     def __init__(self, param: int, thresh: Union[int, float]):
         self.param = param
         self.thresh = thresh
 
-    def __call__(self, dist: Tensor) -> Union[Tensor, Tuple[Tensor, ...]]:
-        return self.postprocess(dist)
+    def __call__(self, pred: Dict[str, Tensor]) -> Union[Tensor, Tuple[Tensor, ...]]:
+        return self.postprocess(pred["dist_map"])
 
-    def postprocess_fn(self, dist_map: Tensor, *args) -> Tensor:
-        return NucleiInstances.from_dist_map(dist_map, self.param, self.thresh).as_tensor()
+    def postprocess_fn(self, dist: Tensor) -> Tensor:
+        return NucleiInstances.from_dist_map(dist, self.param, self.thresh).as_tensor()
 
 
 class HVPostProcess(Postprocess):
@@ -50,16 +55,19 @@ class HVPostProcess(Postprocess):
 
    The postprocessing strategy by Graham et al. 2019 is used to identify nuclei instances.
    """
-    def __init__(self):
-        pass
 
-    def __call__(self, hv_map: Tensor, seg: Tensor) -> Union[Tensor, Tuple[Tensor, ...]]:
-        seg_mask = seg >= 0.5
-        return self.postprocess(hv_map, seg_mask)
+    def __init__(self, seg_thresh: Union[str, float] = 0.5):
+        self.seg_thresh = seg_thresh
 
-    def postprocess_fn(self, hv_map: Tensor, seg_mask: Tensor) -> Tensor:
-        return NucleiInstances.from_hv_map(hv_map, seg_mask).as_tensor()
+    def __call__(self, pred: Dict[str, Tensor]) -> Union[Tensor, Tuple[Tensor, ...]]:
+        seg = pred["seg_mask"]
+        if torch.is_floating_point(seg):
+            seg = torch.sigmoid(seg)
 
+        return self.postprocess(seg, pred["hv_map"])
+
+    def postprocess_fn(self, seg: Tensor, hv_map: Tensor) -> Tensor:
+        return NucleiInstances.from_hv_map(hv_map, seg, self.seg_thresh).as_tensor()
 
 if __name__ == '__main__':
     from data.MoNuSeg.data_module import MoNuSegDataModule
