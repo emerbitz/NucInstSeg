@@ -1,16 +1,22 @@
+import warnings
+
 import cv2
 import numpy as np
 from scipy.ndimage import label
-from skimage.segmentation import watershed
 from skimage.morphology import remove_small_objects
+from skimage.segmentation import watershed
 
 
 def graham_postprocess(hv_map: np.ndarray, seg_mask: np.ndarray) -> np.ndarray:
     """
-    Postprocessing pipeline by Graham et al. 2019.
+    Postprocessing pipeline from Graham et al. 2019.
 
     Code taken from:
     https://github.com/vqdang/hover_net/blob/master/models/hovernet/post_proc.py
+
+    Adaption:
+    Warnings of remove_small_objects are disabled, as the function throws a warning,
+    if only a single object was detected.
     """
     # Noise suppression:
     remove_small_objects(seg_mask, min_size=10, out=seg_mask)  # Hard coded size
@@ -39,16 +45,19 @@ def graham_postprocess(hv_map: np.ndarray, seg_mask: np.ndarray) -> np.ndarray:
     # Remove contours from nuclei:
     marker = seg_mask - contours
     marker[marker < 0] = 0
-    ## Fill holes:
+    # Fill holes:
     # marker = binary_fill_holes(marker).astype("uint8")
-    ## Morphological opening:
+    # Morphological opening:
+    # marker = marker.astype("uint8")  # Uncomment if no filling is performed
     # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     # marker = cv2.morphologyEx(marker, cv2.MORPH_OPEN, kernel)
-    ## Label marker:
+    # Label marker:
     # se = np.array([[0,1,0],[1,1,1],[0,1,0]])  # 1-connected neighborhood
     se = np.array([[1, 1, 1], [1, 1, 1], [1, 1, 1]])  # 2-connected neighborhood
     marker = label(marker, structure=se)[0]
-    ## Remove small objects:
-    # marker = remove_small_objects(marker, min_size=4)  # Hard coded size
+    # Remove small objects:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        marker = remove_small_objects(marker, min_size=10)  # Hard coded size
 
     return watershed(energy_landscape, markers=marker, mask=seg_mask)
