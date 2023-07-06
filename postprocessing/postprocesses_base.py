@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
+
 from torch import Tensor
 
 from evaluation.utils import is_batched
@@ -11,13 +12,14 @@ class Postprocess(ABC):
     """
 
     @abstractmethod
-    def __call__(self, *args) -> Union[Tensor, Tuple[Tensor, ...]]:
+    def __call__(self, pred: Dict[str, Tensor]) -> Union[Tensor, Tuple[Tensor, ...]]:
         """
         Define here the postprocessing pipeline.
 
-        First, you might want to perform some operation on batch level.
+        First, you might want to perform some operation on the batch level like applying an activation function.
         Finally, you will probably want to call the postprocess function.
         """
+        pass
 
     @abstractmethod
     def postprocess_fn(self, *args) -> Tensor:
