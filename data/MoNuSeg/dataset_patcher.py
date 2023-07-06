@@ -1,7 +1,8 @@
 from pathlib import Path
-from tqdm import tqdm
 from typing import List, NoReturn, Tuple, Union
+
 import torch
+from tqdm import tqdm
 
 from data.MoNuSeg.dataset import MoNuSeg
 from transformation.transformations import Split
@@ -21,8 +22,6 @@ class MoNuSegPatcher:
             self.dirs.append(self.data.cont_mask_dir)
         if self.data.distance_map:
             self.dirs.append(self.data.dist_map_dir)
-        if self.data.hv_distance_map:
-            self.dirs.append(self.data.hv_map_dir)
         if self.data.instances:
             self.dirs.append(self.data.inst_dir)
 
