@@ -1,9 +1,10 @@
 from pathlib import Path
-from typing import Any, List, Union
+from typing import Any, Dict, List, Union
 
 import numpy as np
 import torch
 from PIL import Image
+from torch import Tensor
 from torch.utils.data import Dataset
 
 from data.MoNuSeg.ground_truth import NucleiInstances
@@ -69,7 +70,7 @@ class MoNuSeg(Dataset):
                    "TCGA-ZF-A9R5-01A-01-TS1"]
 
     def __init__(self, root: str = "datasets", segmentation_masks: bool = True, contour_masks: bool = True,
-                 distance_maps: bool = True, hv_distance_maps: bool = True, instances: bool = True,
+                 distance_maps: bool = False, hv_distance_maps: bool = False, instances: bool = True,
                  labels: bool = False, transforms=None, dataset: Union[List[str], str] = "Whole",
                  size: str = "Original"):
         self.segmentation_mask = segmentation_masks
@@ -106,12 +107,12 @@ class MoNuSeg(Dataset):
             raise ValueError(f"Size should be 'Original' or '256'. Got instead {size}")
         self.size = size
 
-    def __getitem__(self, idx: int) -> List[Any]:
+    def __getitem__(self, idx: int) -> Dict[str, Any]:
         """
         Retrieves the image and the associated ground truth(s)
         """
         file = self.data[idx]
-        output = []
+        output = {}
 
         if self.size == "Original":
             output = self._get_item_original(file=file, output=output)
@@ -120,8 +121,20 @@ class MoNuSeg(Dataset):
 
         if self.transforms is not None:
             output = self.transforms(output)
+
+        if self.hv_distance_map:
+            inst = output["inst"]
+            if isinstance(inst, Tensor):
+                hv_map = NucleiInstances.from_inst(inst).to_hv_map(order="CHW")  # Shape (C, H, W)
+                hv_map = torch.from_numpy(hv_map)
+            elif isinstance(inst, List):
+                hv_map = NucleiInstances(inst).to_hv_map(order="HWC")  # Shape (H, W, C)
+            else:
+                raise TypeError(f"Inst should be tensor or list. Got instead {type(inst)}.")
+            output["hv_map"] = hv_map
+
         if self.labels:
-            output.append(file)
+            output["label"] = file
         return output
 
     def __len__(self) -> int:
@@ -155,60 +168,52 @@ class MoNuSeg(Dataset):
                              f"'Whole'. Got instead {dataset}.")
         return data
 
-    def _get_item_original(self, file: str, output: list) -> List[Any]:
+    def _get_item_original(self, file: str, output: Dict[str, Any]) -> Dict[str, Any]:
         """Retrieves the image and associated ground truth(s) in the original size (i.e., 1000x1000 pixels)."""
         img_file = Path(self.img_dir, file + ".tif")
         img = Image.open(img_file)
-        output.append(img)
+        output["img"] = img
 
         if self.segmentation_mask:
             seg_mask_file = Path(self.seg_mask_dir, file + ".npy")
             seg_mask = np.load(str(seg_mask_file))
-            output.append(seg_mask)
+            output["seg_mask"] = seg_mask
         if self.contour_mask:
             cont_mask_file = Path(self.cont_mask_dir, file + ".npy")
             cont_mask = np.load(str(cont_mask_file))
-            output.append(cont_mask)
+            output["cont_mask"] = cont_mask
         if self.distance_map:
             dist_map_file = Path(self.dist_map_dir, file + ".npy")
             dist_map = np.load(str(dist_map_file))
-            output.append(dist_map)
-        if self.hv_distance_map:
-            hv_map_file = Path(self.hv_map_dir, file + ".npy")
-            hv_map = np.load(str(hv_map_file))
-            output.append(hv_map)
+            output["dist_map"] = dist_map
         if self.instances:
             inst_file = Path(self.inst_dir, file + ".xml")
             inst = NucleiInstances.from_MoNuSeg(inst_file).as_ndarray()
-            output.append(inst)
+            output["inst"] = inst
 
         return output
 
-    def _get_item_256(self, file: str, output: list) -> List[Any]:
+    def _get_item_256(self, file: str, output: Dict[str, Any]) -> Dict[str, Any]:
         """Retrieves the image and associated ground truth(s) in the size 256x256 pixels."""
         img_file = Path(self.img_dir, file + ".pt")
         img = torch.load(img_file)
-        output.append(img)
+        output["img"] = img
 
         if self.segmentation_mask:
             seg_mask_file = Path(self.seg_mask_dir, file + ".pt")
             seg_mask = torch.load(seg_mask_file)
-            output.append(seg_mask)
+            output["seg_mask"] = seg_mask
         if self.contour_mask:
             cont_mask_file = Path(self.cont_mask_dir, file + ".pt")
             cont_mask = torch.load(cont_mask_file)
-            output.append(cont_mask)
+            output["cont_mask"] = cont_mask
         if self.distance_map:
             dist_map_file = Path(self.dist_map_dir, file + ".pt")
             dist_map = torch.load(dist_map_file)
-            output.append(dist_map)
-        if self.hv_distance_map:
-            hv_map_file = Path(self.hv_map_dir, file + ".pt")
-            hv_map = torch.load(hv_map_file)
-            output.append(hv_map)
+            output["dist_map"] = dist_map
         if self.instances:
             inst_file = Path(self.inst_dir, file + ".pt")
             inst = torch.load(inst_file)
-            output.append(inst)
+            output["inst"] = inst
 
         return output
