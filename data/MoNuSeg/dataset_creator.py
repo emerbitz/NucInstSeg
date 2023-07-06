@@ -18,7 +18,7 @@ class MoNuSegCreator:
         self.label_dir = Path(self.base_dir, "Annotations")
 
     def save_ground_truths(self, segmentation_masks: bool = True, contour_masks: bool = True,
-                           distance_maps: bool = True, hv_distance_maps: bool=True) -> None:
+                           distance_maps: bool = True) -> None:
         """
         Generates and saves the ground truths of the specified types if the ground truths do not exist
         """
@@ -30,8 +30,6 @@ class MoNuSegCreator:
             self.save_truth_type("Contour masks")
         if distance_maps:
             self.save_truth_type("Distance maps")
-        if hv_distance_maps:
-            self.save_truth_type("HV distance maps")
 
     @staticmethod
     def make_seg_mask(label: Path) -> np.ndarray:
@@ -57,14 +55,6 @@ class MoNuSegCreator:
         instances = NucleiInstances.from_MoNuSeg(label)
         return instances.to_dist_map()
 
-    @staticmethod
-    def make_hv_map(label: Path) -> np.ndarray:
-        """
-        Generates the distance map for the specified label
-        """
-        instances = NucleiInstances.from_MoNuSeg(label)
-        return instances.to_hv_map()
-
     def save_truth_type(self, truth_type: str) -> None:
         """
         Generates and saves the ground truths of the specified type if the ground truths do not exist.
@@ -86,11 +76,9 @@ class MoNuSegCreator:
                 truth = instances.to_cont_mask()
             elif truth_type == "Distance maps":
                 truth = instances.to_dist_map()
-            elif truth_type == "HV distance maps":
-                truth = instances.to_hv_map()
             else:
                 raise ValueError(
-                    f"Truth type must be 'Segmentation masks', 'Contour masks', 'Distance maps' or 'HV distance maps'. "
+                    f"Truth type must be 'Segmentation masks', 'Contour masks' or 'Distance maps'. "
                     f"Got instead {truth_type}.")
             save_path = Path(save_dir, label.stem + ".npy")
             np.save(str(save_path), truth)
