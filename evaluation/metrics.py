@@ -1,9 +1,10 @@
-from typing import Optional, Dict
+from typing import Callable, Optional, Dict
 
 import torch
 import torchmetrics
 from scipy.optimize import linear_sum_assignment
 from torch import Tensor
+from torch.nn import Module
 from torchmetrics import Metric
 
 from evaluation.metrics_base import Score
@@ -24,19 +25,27 @@ class DSC(Score, Metric):
     def __init__(self, ignore_background: bool = True):
         super().__init__()
         if ignore_background:
-            ignore_idx = 0
+            ignore_idx = 0  # 0 is background
         else:
             ignore_idx = None
-        self.dice = torchmetrics.Dice(threshold=None, ignore_index=ignore_idx)
+        self.dice = torchmetrics.Dice(ignore_index=ignore_idx)
 
     def evaluate(self, pred_inst: Tensor, gt_inst: Tensor) -> None:
-        pred_mask = torch.any(pred_inst, dim=0)
         gt_mask = torch.any(gt_inst, dim=0)
+        if is_empty(pred_inst):  # No nuclei detected
+            pred_mask = torch.zeros(gt_mask.shape, dtype=torch.bool, device=self.device)
+        else:  # One or more nuclei detected
+            pred_mask = torch.any(pred_inst, dim=0)
         self.dice.update(preds=pred_mask, target=gt_mask)
 
     def compute(self) -> Dict[str, Tensor]:
-        # print(f"TP: {self.dice.tp}, FP: {self.dice.fp}, FN: {self.dice.fn}")
+        # print(self.dice.tp, self.dice.fp, self.dice.fn)
         return {"DSC": self.dice.compute()}
+
+    def _apply(self, fn: Callable) -> Module:
+        self.dice._apply(fn)
+        return super()._apply(fn)
+
 
 # class PQ_v0(Score, Metric):
 #     """Implementation of the Panoptic Quality (PQ) using torchmetrics. PQ is the product of the Detection Quality (DQ)
@@ -85,18 +94,17 @@ class PQ(Score, Metric):
 
     def __init__(self):
         super().__init__()
-        self.add_state("TP", default=torch.tensor(0, dtype=torch.int), dist_reduce_fx="sum", persistent=False)
-        self.add_state("FN", default=torch.tensor(0, dtype=torch.int), dist_reduce_fx="sum", persistent=False)
-        self.add_state("FP", default=torch.tensor(0, dtype=torch.int), dist_reduce_fx="sum", persistent=False)
+        self.add_state("TP", default=torch.tensor(0, dtype=torch.long), dist_reduce_fx="sum", persistent=False)
+        self.add_state("FN", default=torch.tensor(0, dtype=torch.long), dist_reduce_fx="sum", persistent=False)
+        self.add_state("FP", default=torch.tensor(0, dtype=torch.long), dist_reduce_fx="sum", persistent=False)
         self.add_state("IoU", default=torch.tensor(0, dtype=torch.float), dist_reduce_fx="sum", persistent=False)
 
     def evaluate(self, pred_inst: Tensor, gt_inst: Tensor) -> None:
         """Updates the states TP, FN, FP and IoU."""
-        device = pred_inst.device
         num_pred = pred_inst.shape[0]
         num_gt = gt_inst.shape[0]
-        pairwise_inter = torch.zeros((num_pred, num_gt), dtype=torch.int, device=device)
-        pairwise_union = torch.zeros((num_pred, num_gt), dtype=torch.int, device=device)
+        pairwise_inter = torch.zeros((num_pred, num_gt), dtype=torch.int, device=self.device)
+        pairwise_union = torch.zeros((num_pred, num_gt), dtype=torch.int, device=self.device)
         for col, gt in enumerate(gt_inst):
             for row, pred in enumerate(pred_inst):
                 pairwise_inter[row, col] = tensor_intersection(pred, gt)
@@ -112,7 +120,7 @@ class PQ(Score, Metric):
     def compute(self) -> Dict[str, Tensor]:
         """Computes the Detection Quality (DQ), the Segmentation Quality (SQ) and the Panoptic Quality (PQ)."""
         dq = 2 * self.TP / (2 * self.TP + self.FN + self.FP)
-        sq = self.IoU / self.TP
+        sq = (self.IoU / self.TP).float()
         return {"DQ": dq, "SQ": sq, "PQ": dq * sq}
 
 
@@ -253,17 +261,17 @@ class AJI(Score, Metric):
 
     def __init__(self):
         super().__init__()
-        self.add_state("intersection", default=torch.tensor(0, dtype=torch.int), dist_reduce_fx="sum", persistent=False)
-        self.add_state("union", default=torch.tensor(0, dtype=torch.int), dist_reduce_fx="sum", persistent=False)
+        self.add_state("intersection", default=torch.tensor(0, dtype=torch.long), dist_reduce_fx="sum",
+                       persistent=False)
+        self.add_state("union", default=torch.tensor(0, dtype=torch.long), dist_reduce_fx="sum", persistent=False)
 
     def evaluate(self, pred_inst: Tensor, gt_inst: Tensor) -> None:
         """Updates the states intersection and union."""
         if not is_empty(pred_inst):
-            device = pred_inst.device
             num_pred = pred_inst.shape[0]
             num_gt = gt_inst.shape[0]
-            pairwise_inter = torch.zeros((num_pred, num_gt), dtype=torch.int, device=device)
-            pairwise_union = torch.zeros((num_pred, num_gt), dtype=torch.int, device=device)
+            pairwise_inter = torch.zeros((num_pred, num_gt), dtype=torch.int, device=self.device)
+            pairwise_union = torch.zeros((num_pred, num_gt), dtype=torch.int, device=self.device)
             for col, gt in enumerate(gt_inst):
                 for row, pred in enumerate(pred_inst):
                     pairwise_inter[row, col] = tensor_intersection(pred, gt)
@@ -305,17 +313,17 @@ class ModAJI(Score, Metric):
 
     def __init__(self):
         super().__init__()
-        self.add_state("intersection", default=torch.tensor(0, dtype=torch.int), dist_reduce_fx="sum", persistent=False)
-        self.add_state("union", default=torch.tensor(0, dtype=torch.int), dist_reduce_fx="sum", persistent=False)
+        self.add_state("intersection", default=torch.tensor(0, dtype=torch.long), dist_reduce_fx="sum",
+                       persistent=False)
+        self.add_state("union", default=torch.tensor(0, dtype=torch.long), dist_reduce_fx="sum", persistent=False)
 
     def evaluate(self, pred_inst: Tensor, gt_inst: Tensor) -> None:
         """Updates the states intersection and union."""
         if not is_empty(pred_inst):
-            device = pred_inst.device
             num_pred = pred_inst.shape[0]
             num_gt = gt_inst.shape[0]
-            pairwise_inter = torch.zeros((num_pred, num_gt), dtype=torch.int, device=device)
-            pairwise_union = torch.zeros((num_pred, num_gt), dtype=torch.int, device=device)
+            pairwise_inter = torch.zeros((num_pred, num_gt), dtype=torch.int, device=self.device)
+            pairwise_union = torch.zeros((num_pred, num_gt), dtype=torch.int, device=self.device)
             for col, gt in enumerate(gt_inst):
                 for row, pred in enumerate(pred_inst):
                     pairwise_inter[row, col] = tensor_intersection(pred, gt)
