@@ -1,11 +1,10 @@
-import random
 from typing import Tuple
 
 import pytorch_lightning as pl
 import torch
 from torch.utils.data import DataLoader
 
-from augmentation.augmentations import RandHorizontalFlip, RandRotate, RandVerticalFlip
+from augmentation.augmentations import RandHorizontalFlip, RandRotate, RandVerticalFlip, ColorJitter, GaussianBlur
 from data.MoNuSeg.dataset import MoNuSeg
 from data.MoNuSeg.utils import custom_collate
 from transformation.transformations import Combine
@@ -21,7 +20,11 @@ class MoNuSegDataModule(pl.LightningDataModule):
                  img_size: Tuple[int, int] = (256, 256),
                  train_transforms=Combine([RandHorizontalFlip(p=0.5),
                                            RandVerticalFlip(p=0.5),
-                                           RandRotate(degrees=360.)]),
+                                           RandRotate(degrees=90.),
+                                           GaussianBlur(),
+                                           ColorJitter(saturation=0.5),
+                                           ]),
+
                  val_transforms=None,
                  test_transforms=None
                  ):
@@ -52,16 +55,23 @@ class MoNuSegDataModule(pl.LightningDataModule):
     def setup(self, stage: str = None) -> None:
         if stage == "fit" or stage is None:
             # Splitting of train dataset into train and validation dataset
+            # a) Training data according to original publication by Kumar et al. 2017
             training_dataset = MoNuSeg.select_data(dataset="Train")
-            random.shuffle(training_dataset)
-            train_dataset, val_dataset = training_dataset[:12], training_dataset[12:]
+            # Different organ (i.e., prostate) validation set:
+            # train_dataset, val_dataset = training_dataset[:12], training_dataset[12:]
+            # Same organ validation set:
+            val_dataset = [training_dataset[0], training_dataset[4], training_dataset[9], training_dataset[14]]
+            train_dataset = [data for data in training_dataset if data not in val_dataset]
+            # b) Training data according to the MoNuSeg 2018 Kaggle challenge
+            # train_dataset = MoNuSeg.select_data(dataset="Train")
+            # val_dataset = MoNuSeg.select_data(dataset="Test")
 
             self.train_data = MoNuSeg(
                 root=self.root,
                 segmentation_masks=self.seg_masks,
                 contour_masks=self.cont_masks,
                 distance_maps=self.dist_maps,
-                hv_distance_maps= self.hv_maps,
+                hv_distance_maps=self.hv_maps,
                 labels=self.labels,
                 instances=True,
                 dataset=train_dataset,
