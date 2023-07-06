@@ -1,6 +1,7 @@
-import numpy as np
+from typing import Any, Dict, List, NoReturn, Union, Tuple
+
 import PIL
-from typing import Any, List, NoReturn, Union, Sequence, Tuple
+import numpy as np
 import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as f
@@ -9,13 +10,14 @@ from augmentation.augmentation_base import Augmentation
 from transformation.transformation_base import Transformation
 from transformation.utils import remove_zero_stacks, ceiling
 
+
 class Combine:
     """Allows for the combination of Augmentation and Transformation subclasses"""
 
     def __init__(self, transforms: List[Union[Augmentation, Transformation]]):
         self.transforms = transforms
 
-    def __call__(self, imgs: List[Any]) -> List[Any]:
+    def __call__(self, imgs: Dict[str, Any]) -> Dict[str, Any]:
         for transform in self.transforms:
             imgs = transform(imgs)
         return imgs
