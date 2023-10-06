@@ -1,9 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Tuple, Union
-import torch
-from torch import Tensor
 
-from evaluation.utils import is_batched
+from torch import Tensor
 
 
 class Score(ABC):
@@ -21,7 +19,7 @@ class Score(ABC):
             for pred_inst, gt_inst in zip(preds, target):
                 self.evaluate(pred_inst=pred_inst, gt_inst=gt_inst)
         elif isinstance(preds, Tensor):  # Batch size = 1
-            self.evaluate(pred_inst=preds, gt_inst=target)
+            self.evaluate(pred_inst=preds.squeeze(), gt_inst=target.squeeze())
         else:
             raise TypeError(f"Preds should be of type tuple or tensor. Got instead {type(preds)}.")
 
