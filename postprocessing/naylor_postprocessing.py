@@ -1,24 +1,41 @@
-from typing import Union
+from typing import Optional, Union
+
 import numpy as np
+from skimage import img_as_ubyte
 from skimage.measure import label
 from skimage.morphology import reconstruction, dilation, erosion, disk, square
 from skimage.segmentation import watershed
-from skimage import img_as_ubyte
+
+from data.MoNuSeg.utils import threshold
 
 
-def naylor_postprocess(dist_map: np.ndarray, param: int = 7, thresh: Union[int, float] = 0.5) -> np.ndarray:
+def naylor_postprocess(dist_map: np.ndarray, naylor_params: Optional[dict] = None, param: int = 7,
+                       thresh: Union[int, float] = 0.5) -> np.ndarray:
     """
     Postprocessing pipeline based on dynamic watershed segmentation by Naylor et al. 2019.
 
     Code taken from:
     https://github.com/PeterJackNaylor/DRFNS/blob/73fc5683db5e9f860846e22c8c0daf73b7103082/src_RealData/postproc/postprocessing.py
     """
-    return DynamicWatershedAlias(dist_map, param, thresh)
+    # Define default hyperparameters:
+    default_params = {
+        "thresh_dist": "triangle",
+        "h_param": 1,
+    }
+    if naylor_params is None:
+        naylor_params = {}
+    # Overwrite default hyperparameters:
+    naylor_params = {**default_params, **naylor_params}
+
+    return DynamicWatershedAlias(dist_map, naylor_params["h_param"], naylor_params["thresh_dist"])
 
 
 """
 Code hereafter is copied-and-pasted from the GitHub repository of Peter Naylor:
 https://github.com/PeterJackNaylor/DRFNS/blob/73fc5683db5e9f860846e22c8c0daf73b7103082/src_RealData/postproc/postprocessing.py
+
+Adaption:
+* Threshold for distance map can now also be automatically determined.
 """
 
 def PrepareProb(img, convertuint8=True, inverse=True):
@@ -109,7 +126,8 @@ def DynamicWatershedAlias(p_img, lamb=7, p_thresh=0.5):
     """
     Applies our dynamic watershed to 2D prob/dist image.
     """
-    b_img = (p_img > p_thresh) + 0
+    # b_img = (p_img > p_thresh) + 0
+    b_img = threshold(p_img, p_thresh).astype(np.int32)  # Relation: greater_or_equal instead of greater (cf. above)
     Probs_inv = PrepareProb(p_img)
 
     Hrecons = HreconstructionErosion(Probs_inv, lamb)
