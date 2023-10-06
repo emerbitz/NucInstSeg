@@ -1,20 +1,17 @@
 import pytorch_lightning as pl
 import torch
-from torch import Tensor
 import torch.nn as nn
+from torch import Tensor
 
 from data.MoNuSeg.illustrator import Picture
-from postprocessing.postprocesses import SegPostProcess
 from evaluation.metrics import PQ, AJI
-
-from transformation.transformations import PadZeros
-from augmentation.augmentations import RandCrop
+from postprocessing.postprocesses import SegPostProcess
 
 
 class ALNetModel(pl.LightningModule):
     # def __init__(self, model, lr: int = 2e-4, lambda_main: int = 1, lambda_aux: int = 1) -> None:
     def __init__(self, model) -> None:
-        super(ALNetModel, self).__init__()
+        super().__init__()
         # Use in combination with the detailed ModelSummary callback
         # self.example_input_array = Tensor(8, 3, 256, 256)
         self.save_hyperparameters(ignore=["model"])
