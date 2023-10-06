@@ -1,18 +1,21 @@
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Literal, Optional
 from xml.dom import minidom
 
 import numpy as np
 import torch
 from scipy.ndimage import center_of_mass, distance_transform_cdt
 from skimage.draw import polygon2mask
-from skimage.morphology import binary_dilation, square, remove_small_objects
-from skimage.segmentation import find_boundaries, flood
+from skimage.segmentation import find_boundaries
 from torch import Tensor
 
-from data.MoNuSeg.utils import get_bbox, prob_to_mask, cuda_tensor_to_ndarray
+from data.MoNuSeg.utils import get_bbox, threshold, cuda_tensor_to_ndarray
+from postprocessing.baseline_postprocessing import baseline_postprocess
+from postprocessing.exprmtl_postprocessing import exprmtl_postprocess
 from postprocessing.graham_postprocessing import graham_postprocess
 from postprocessing.naylor_postprocessing import naylor_postprocess
+from postprocessing.noname_postprocessing import noname_postprocess
+from postprocessing.yang_postprocessing import yang_postprocess
 
 
 class NucleiInstances:
@@ -54,7 +57,7 @@ class NucleiInstances:
         tree = dom.documentElement
         regions = tree.getElementsByTagName("Region")
         nuc_inst = []
-        empty_regions = 0
+        # empty_regions = 0
         for region in regions:
             vertexes = region.getElementsByTagName("Vertex")
             polygon = []
@@ -63,57 +66,59 @@ class NucleiInstances:
             mask = polygon2mask(image_shape=NucleiInstances.SHAPE_KUMAR, polygon=polygon)
             if mask.any():  # Check for emtpy masks
                 nuc_inst.append(mask)
-            else:
-                empty_regions += 1
-        print(f"Found {empty_regions} empty regions in {str(label)}")
+            # else:
+        #         empty_regions += 1
+        # print(f"Found {empty_regions} empty regions in {str(label)}")
         return NucleiInstances(nuc_inst)
 
     @staticmethod
-    def from_seg(seg: Tensor, cont: Optional[Tensor] = None, seg_thresh: Union[str, float] = 0.5,
-                 cont_thresh: Union[str, float] = 0.5) -> "NucleiInstances":
+    def from_seg(seg: Tensor, cont: Optional[Tensor] = None, seg_params: Optional[dict] = None,
+                 mode: Literal["baseline", "noname", "yang"] = "noname") -> "NucleiInstances":
         """
-        Extracts nuclei instances from a segmentation via flooding.
+        Extracts nuclei instances from the (nuclei) segmentation.
 
-        If a contour is provided, then the contour is subtracted from the segmentation prior to flooding.
+        Three different postprocessing pipelines are available for nuclei instance extraction:
+        * Baseline postprocessing pipeline:
+            The postprocessing pipeline does not split touching/overlapping nuclei and is intended to serve as a
+            baseline for performance comparison with the other postprocessing pipelines (that are hopefully able to
+            split touching/overlapping nuclei XD).
+        * Noname postprocessing pipeline:
+            Nuclei instances are extracted using the watershed algorithm. Markers for watershed segmentation
+            are obtained by removing the nuclei contours from the whole nuclei.
+        * Yang postprocessing pipeline:
+            The postprocessing pipeline is based on the paper "Nuclei segmentation using marker-controlled watershed,
+            tracking using mean-shift, and Kalman filter in time-lapse microscopy" by Yang et al. 2006. In brief, the
+            pipeline extracts nuclei instance via marker-controlled watershed. Markers are obtained by the conditional
+            erosion of the (nuclei) segmentation mask with first coarse erosion structures and second fine erosion
+            structures.
         """
+        default_params = {
+            "thresh_seg": 0.5,
+            "thresh_cont": 0.2
+        }
+        if seg_params is None:
+            seg_params = {}
+        seg_params = {**default_params, **seg_params}
+
         seg = cuda_tensor_to_ndarray(seg)
-        seg_mask = prob_to_mask(seg, thresh=seg_thresh)
-        remove_small_objects(seg_mask, min_size=15, out=seg_mask)  # Noise suppression; hard coded # Maybe insert later
-        if cont is not None:
-            cont = cuda_tensor_to_ndarray(cont)
-            cont_mask = prob_to_mask(cont, cont_thresh)
-            mask = seg_mask * np.logical_not(cont_mask)
-        else:
-            mask = seg_mask
-        # Noise suppression:
-        # remove_small_objects(mask, min_size=30, out=mask)
+        seg_mask = threshold(seg, thresh=seg_params["thresh_seg"])
 
-        height, width = mask.shape
-        nuclei = []
-        for y in range(height):
-            for x in range(width):
-                if mask[y, x]:
-                    nucleus = flood(mask, seed_point=(y, x))  # Region growing with 8-connected neighborhood
-                    mask = np.logical_xor(mask, nucleus)  # Removes the nucleus from the mask
-                    # if cont is not None:
-                    #     nucleus = binary_dilation(nucleus, square(3))  # * seg_mask
-                    nuclei.append(nucleus)
-        if cont is not None:
-            flag = True
-            while flag:
-                flag = False
-                for idx, nucleus in enumerate(nuclei):
-                    a = binary_dilation(nucleus, footprint=square(3, dtype=bool), out=None) * cont_mask
-                    if a.any():
-                        nuclei[idx] += a
-                        cont_mask = cont_mask * ~a
-                        flag = True
-        return NucleiInstances(nuclei)
+        if mode == "baseline":
+            labeled_inst = baseline_postprocess(seg_mask=seg_mask, baseline_params=seg_params)
+        elif mode == "noname":
+            cont = cuda_tensor_to_ndarray(cont)
+            cont_mask = threshold(cont, thresh=seg_params["thresh_cont"])
+            labeled_inst = noname_postprocess(seg_mask=seg_mask, cont_mask=cont_mask, noname_params=seg_params)
+        elif mode == "yang":
+            labeled_inst = yang_postprocess(seg_mask=seg_mask, yang_params=seg_params)
+
+        return NucleiInstances.from_labeled_inst(labeled_inst)
 
     @staticmethod
-    def from_dist_map(dist_map: Tensor, param: int, thresh: Union[int, float]) -> "NucleiInstances":
+    def from_dist_map(dist_map: Tensor, dist_params: Optional[dict] = None) \
+            -> "NucleiInstances":
         """
-        Extracts nuclei instances from a distance map via the postprocessing strategy by Naylor et al. 2019.
+        Extracts nuclei instances from the distance map via the postprocessing strategy by Naylor et al. 2019.
         """
 
         dist_map[dist_map > 255] = 255
@@ -121,22 +126,32 @@ class NucleiInstances:
 
         dist_map = cuda_tensor_to_ndarray(dist_map)
 
-        labeled_inst = naylor_postprocess(dist_map, param, thresh)
+        labeled_inst = naylor_postprocess(dist_map, dist_params)
         return NucleiInstances.from_labeled_inst(labeled_inst)
 
     @staticmethod
-    def from_hv_map(hv_map: Tensor, seg: Tensor, seg_thresh: Union[str, float] = 0.5) -> "NucleiInstances":
+    def from_hv_map(hv_map: Tensor, seg: Tensor, hv_params: Optional[dict] = None,
+                    exprmtl: bool = False) -> "NucleiInstances":
         """
-        Extracts nuclei instances from a horizontal and vertical distance map via the postprocessing strategy by
+        Extracts nuclei instances from the horizontal and vertical distance map via the postprocessing strategy by
          Graham et al. 2019.
         """
+        default_params = {
+            "thresh_seg": 0.5,
+        }
+        if hv_params is None:
+            hv_params = {}
+        hv_params = {**default_params, **hv_params}
 
         hv_map = cuda_tensor_to_ndarray(hv_map)
 
         seg = cuda_tensor_to_ndarray(seg)
-        seg_mask = prob_to_mask(seg, seg_thresh)
+        seg_mask = threshold(seg, thresh=hv_params["thresh_seg"])
 
-        labeled_inst = graham_postprocess(hv_map, seg_mask)
+        if exprmtl:
+            labeled_inst = exprmtl_postprocess(hv_map, seg_mask, hv_params)
+        else:
+            labeled_inst = graham_postprocess(hv_map, seg_mask, hv_params)
 
         return NucleiInstances.from_labeled_inst(labeled_inst)
 
@@ -148,7 +163,7 @@ class NucleiInstances:
         Premiss: Labels are continuous (e.g. [0, 1, 2, 3] and not [0, 1, 3]).
         """
         nuclei = []
-        for l in range(1, labeled_inst.max()+1):  # 0 is background
+        for l in range(1, labeled_inst.max() + 1):  # 0 is background
             nucleus = labeled_inst == l
             nuclei.append(nucleus)
         return NucleiInstances(nuclei)
