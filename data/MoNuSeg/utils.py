@@ -3,7 +3,8 @@ from typing import Callable, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import torch
-from skimage.filters import threshold_otsu
+from skimage.filters import threshold_otsu, threshold_yen, threshold_isodata, threshold_li, threshold_minimum, \
+    threshold_mean, threshold_triangle
 from torch import Tensor
 from torch.utils.data._utils.collate import default_collate, collate, default_collate_fn_map
 
@@ -94,27 +95,39 @@ def center_of_mass(mask: Union[np.ndarray, Tensor]) -> Tuple[float, float]:
     return float(y), float(x)
 
 
-def prob_to_mask(prob: np.ndarray, thresh: Union[str, float] = 0.5) -> np.ndarray:
+def threshold(array: np.ndarray, thresh: Union[str, float, int, None] = 0.5) -> np.ndarray:
     """
-    Converts probabilities into a binary mask.
+    Performs thresholding of an array.
 
-    Threshold value is either inferred using the Otsu method (Otsu 1979) or can be given as a float value.
+    Threshold value can be inferred by providing the name of the thresholding method as string. Available methods are:
+    'otsu', 'yen', 'isodata', 'li', 'minimum', 'mean' or 'triangle'. The threshold value can also be directly specified
+    as a float or int value.
     """
-    # Check if conversion to mask is necessary:
-    if issubclass(prob.dtype.type, np.floating):
-        if isinstance(thresh, (str, float)):
-            if isinstance(thresh, str):
-                if thresh == "otsu":
-                    thresh = threshold_otsu(prob)
-                else:
-                    raise ValueError(f"Thresh as string should be 'otsu'. Got instead {thresh}.")
-            mask = prob >= thresh
-        else:
-            raise TypeError(f"Thresh should be string or float. Got instead {type(thresh)}.")
-    else:
-        mask = prob
+    thresh_methods = {"otsu": threshold_otsu,
+                      "yen": threshold_yen,
+                      "isodata": threshold_isodata,
+                      "li": threshold_li,
+                      "minimum": threshold_minimum,
+                      "mean": threshold_mean,
+                      "triangle": threshold_triangle
+                      }
+    # Shortcut:
+    if thresh is None:
+        return array.astype(bool)
 
-    return mask
+    if isinstance(thresh, str):
+        if thresh not in thresh_methods.keys():
+            raise ValueError(f"Thresh should be one of: {', '.join(thresh_methods.keys())}. Got instead '{thresh}'.")
+        try:
+            thresh = float(thresh_methods[thresh](array))
+        except ValueError:
+            print(f"Thresholding method '{thresh}' crashed. Continuing with thresholding method 'otsu' instead.")
+            thresh = float(thresh_methods["otsu"](array))
+
+    if not isinstance(thresh, (float, int)):
+        raise TypeError(f"Thresh should be string, float or int. Got instead {type(thresh)}.")
+
+    return array >= thresh
 
 
 def cuda_tensor_to_ndarray(tensor: Tensor) -> np.ndarray:
