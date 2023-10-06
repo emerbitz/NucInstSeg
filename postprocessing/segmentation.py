@@ -1,11 +1,11 @@
-from abc import ABC, abstractmethod
 from typing import Tuple, Union
+
 import torch
 from torch import Tensor
 
 from data.MoNuSeg.ground_truth import NucleiInstances
-from postprocessing.region_growing import RegionGrower
 from evaluation.utils import is_batched
+from postprocessing.region_growing import RegionGrower
 
 
 class InstanceExtractor:
@@ -40,14 +40,14 @@ class InstanceExtractor:
         if impl == "skimage":
             if self.batch_size == 1:
                 if self.cuda:
-                    return NucleiInstances.from_mask(self.mask.cpu()).as_tensor().cuda()
+                    return NucleiInstances.from_seg(self.mask.cpu()).as_tensor().cuda()
                 else:
-                    return NucleiInstances.from_mask(self.mask).as_tensor()
+                    return NucleiInstances.from_seg(self.mask).as_tensor()
             else:
                 if self.cuda:
-                    return tuple(NucleiInstances.from_mask(mask.cpu()).as_tensor().cuda() for mask in self.mask)
+                    return tuple(NucleiInstances.from_seg(mask.cpu()).as_tensor().cuda() for mask in self.mask)
                 else:
-                    return tuple(NucleiInstances.from_mask(mask).as_tensor() for mask in self.mask)
+                    return tuple(NucleiInstances.from_seg(mask).as_tensor() for mask in self.mask)
 
         elif impl == "custom":
             if self.batch_size == 1:
