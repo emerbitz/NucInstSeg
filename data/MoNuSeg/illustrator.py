@@ -3,12 +3,11 @@ from typing import Optional, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
 from skimage.color import label2rgb
 from torch import Tensor
 
 from data.MoNuSeg.ground_truth import NucleiInstances
-from data.MoNuSeg.utils import cuda_tensor_to_ndarray, prob_to_mask
+from data.MoNuSeg.utils import cuda_tensor_to_ndarray, threshold
 
 
 class Picture:
@@ -24,46 +23,55 @@ class Picture:
         return self.data.shape
 
     @staticmethod
-    def from_tensor(img: Tensor, inst: Optional[Tensor] = None, thresh: Union[None, str, float] = None) -> "Picture":
+    def from_tensor(img: Optional[Tensor] = None, inst: Optional[Tensor] = None,
+                    thresh: Union[None, str, float] = None) -> "Picture":
         """
-        Creates the Picture from the tensor image (img).
+        Creates a Picture from the tensor(s).
 
-        If the tensor nuclei instances (inst) is provided in addition to the image, the Picture is created from the
-        overlay of the image  with the nuclei instances.
-        If a threshold (thresh) is provided in addition to the image, the image is thresholded first.
+        If only the image (img) is given, the Picture is created from this image. If additionally a threshold (thresh)
+        is given, the Picture is the thresholded image.
+
+        If only the nuclei instances (inst) are provided, the Picture is a color-coded image of the nuclei instances.
+        If an image is provided as well, the Picture is an overlay of image with the color-coded instances.
         """
-        if inst is not None:
-            img = Picture.create_overlay(img, inst)  # inst: shape (#nuclei, H, W)
-        elif thresh is not None:
+        if thresh is not None:
             img = Picture.create_mask(img, thresh)
-        else:
+        if inst is not None:
+            img = Picture.create_colored_inst(inst, img)  # Inst of shape (#nuclei, H, W)
+        elif img is not None:
             img = Picture.tensor_to_ndarray(img)
+        else:
+            raise ValueError(f"Please provide input tensor for img or inst.")
         return Picture(img)
 
     @staticmethod
-    def create_overlay(img: Tensor, inst: Tensor) -> np.ndarray:
-        """Overlays the tensor image (img) with the tensor nuclei instances (inst)."""
-        img = Picture.tensor_to_ndarray(img)
+    def create_colored_inst(inst: Tensor, img: Optional[Tensor] = None) -> np.ndarray:
+        """
+        Creates a color-coded image of the nuclei instances (inst).
+
+        If an image (img) is provided, then the color-coded instances are painted over the image.
+        """
+        if img is not None:
+            img = Picture.tensor_to_ndarray(img)
         labeled_inst = NucleiInstances.from_inst(
             inst).to_labeled_inst()  # Maybe more direct implementation would be better
         return label2rgb(label=labeled_inst, image=img)
+
 
     @staticmethod
     def create_mask(img: Tensor, thresh: Union[str, float] = 0.5) -> np.ndarray:
         """
         Creates a mask via thresholding.
         """
-        if torch.is_floating_point(img):
-            img = torch.sigmoid(img)
         img = Picture.tensor_to_ndarray(img)
-        return prob_to_mask(img, thresh)
+        return threshold(img, thresh)
 
     @staticmethod
     def tensor_to_ndarray(img: Tensor) -> np.ndarray:
         """Converts a tensor into np.ndarray."""
         img = cuda_tensor_to_ndarray(img)
 
-        if Picture._is_multi_channel(img):
+        if Picture._has_channel(img):
             img = img.transpose((1, 2, 0))
 
         return img
@@ -93,5 +101,5 @@ class Picture:
         return cmap
 
     @staticmethod
-    def _is_multi_channel(img: np.ndarray) -> bool:
+    def _has_channel(img: np.ndarray) -> bool:
         return img.ndim == 3
