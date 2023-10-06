@@ -39,12 +39,14 @@ class DSC(Score, Metric):
         self.dice.update(preds=pred_mask, target=gt_mask)
 
     def compute(self) -> Dict[str, Tensor]:
-        # print(self.dice.tp, self.dice.fp, self.dice.fn)
         return {"DSC": self.dice.compute()}
 
     def _apply(self, fn: Callable) -> Module:
         self.dice._apply(fn)
         return super()._apply(fn)
+
+    def reset(self) -> None:
+        self.dice.reset()
 
 
 # class PQ_v0(Score, Metric):
@@ -119,8 +121,8 @@ class PQ(Score, Metric):
 
     def compute(self) -> Dict[str, Tensor]:
         """Computes the Detection Quality (DQ), the Segmentation Quality (SQ) and the Panoptic Quality (PQ)."""
-        dq = 2 * self.TP / (2 * self.TP + self.FN + self.FP)
-        sq = (self.IoU / self.TP).float()
+        dq = 2 * self.TP / (2 * self.TP + self.FN + self.FP + 1e-6)
+        sq = (self.IoU / (self.TP + 1e-6)).float()
         return {"DQ": dq, "SQ": sq, "PQ": dq * sq}
 
 
@@ -342,7 +344,8 @@ class ModAJI(Score, Metric):
 
     def compute(self) -> Dict[str, Tensor]:
         """Computes the modified Aggregated Jaccard Index (AJI)."""
-        return {"ModAJI": self.intersection / self.union}
+        return {"ModAJI": self.intersection / (self.union + 1e-6)}
+
 
 if __name__ == "__main__":
 
