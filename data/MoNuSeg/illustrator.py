@@ -76,20 +76,22 @@ class Picture:
 
         return img
 
-    def show(self) -> None:
+    def show(self, cmap: Optional[str] = None) -> None:
         """Displays the Picture."""
-        cmap = self._select_cmap()
+        if cmap is None:
+            cmap = self._select_cmap()
         plt.imshow(self.data, cmap=cmap)  # Cmap argument is ignored for RGB data per default
         plt.axis("off")
         plt.show()
 
-    def save(self, file_name: str, save_dir: str = "images"):
+    def save(self, file_name: str, save_dir: str = "images", cmap: Optional[str] = None):
         """Saves the Picture as png."""
         save_dir = Path(save_dir)
         file = Path(save_dir, file_name + ".png")
         if not save_dir.is_dir():
             save_dir.mkdir()
-        cmap = self._select_cmap()
+        if cmap is None:
+            cmap = self._select_cmap()
         plt.imsave(file, arr=self.data, cmap=cmap)  # Cmap argument is ignored for RGB data per default
 
     def _select_cmap(self) -> str:
