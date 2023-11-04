@@ -5,9 +5,10 @@ from skimage.morphology import label, remove_small_objects
 from skimage.segmentation import watershed
 
 
-def noname_postprocess(seg_mask: np.ndarray, cont_mask: np.ndarray, noname_params: Optional[dict] = None) -> np.ndarray:
+def contour_postprocess(seg_mask: np.ndarray, cont_mask: np.ndarray,
+                        noname_params: Optional[dict] = None) -> np.ndarray:
     """
-    Noname postprocessing pipeline for nuclei instance extraction.
+    Contour-based postprocessing pipeline for nuclei instance extraction.
 
     Nuclei instances are extracted using the watershed algorithm. Markers for watershed segmentation are obtained
     by removing the nuclei contours from the whole nuclei.
