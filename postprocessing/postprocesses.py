@@ -3,7 +3,7 @@ from typing import Dict, Literal, Optional, Tuple, Union
 import torch
 from torch import Tensor
 
-from data.MoNuSeg.ground_truth import NucleiInstances
+from data.MoNuSeg.conversion import NucleiInstances
 from postprocessing.postprocesses_base import Postprocess
 
 
@@ -13,12 +13,12 @@ class SegPostProcess(Postprocess):
     """
 
     def __init__(self, seg_params: Optional[dict] = None, actv: bool = True,
-                 mode: Literal["baseline", "noname", "yang"] = "noname"):
+                 mode: Literal["baseline", "contour", "yang"] = "contour"):
 
         self.actv = actv
-        assert mode in ["baseline", "noname", "yang"], f"Mode should be baseline, noname or yang. Got instead {mode}."
+        assert mode in ["baseline", "contour", "yang"], f"Mode should be baseline, contour or yang. Got instead {mode}."
         self.mode = mode
-        self.requires_cont = True if mode == "noname" else False
+        self.requires_cont = True if mode == "contour" else False
         self.seg_params = seg_params
 
     def __call__(self, pred: Dict[str, Tensor]) -> Union[Tensor, Tuple[Tensor, ...]]:
