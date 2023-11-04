@@ -93,9 +93,9 @@ class VolUp(nn.Module):
 
 class Down(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, scale_factor: int = 2, bias: bool = True,
-                 mode: Literal["max", "avg", "conv"] = "conv"):
+                 mode: Literal["max", "avg", "conv", "conv1x1"] = "conv1x1"):
         super().__init__()
-        assert mode in ["max", "avg", "conv"], f"Mode should be max, avg or conv. Got instead {mode}."
+        assert mode in ["max", "avg", "conv", "conv1x1"], f"Mode should be max, avg or conv. Got instead {mode}."
         self.down = nn.ModuleDict({
             "max": nn.Sequential(
                 nn.MaxPool2d(kernel_size=scale_factor, stride=scale_factor),
@@ -106,7 +106,9 @@ class Down(nn.Module):
                 nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, bias=bias, padding="same")
             ),
             "conv": nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=scale_factor,
-                              stride=scale_factor, bias=bias, padding=0)
+                              stride=scale_factor, bias=bias, padding=0),
+            "conv1x1": nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=scale_factor,
+                                 bias=bias, padding=0)
         })[mode]
 
     def forward(self, x: Tensor) -> Tensor:
@@ -122,7 +124,7 @@ class AG(nn.Module):
 
     def __init__(self, in_channels: int, gate_channels: Optional[int] = None, inter_channels: Optional[int] = None,
                  actv_att: nn.Module = nn.Sigmoid(), scale_factor: int = 2, up_mode: str = "bilinear",
-                 down_mode: Literal["max", "avg", "conv"] = "conv"):
+                 down_mode: Literal["max", "avg", "conv", "conv1x1"] = "conv1x1"):
         super().__init__()
         if gate_channels is None:
             gate_channels = in_channels
@@ -149,14 +151,14 @@ class AG(nn.Module):
 
 class ASPP(nn.Module):
     """
-    Atrous Spatial Pyramid Pooling (ASPP).
+    Atrous Spatial Pyramid Pooling (ASPP) with an additional global average pooling layer.
 
     See for more information:
     "DeepLab: Semantic image segmentation with deep convolutional nets, atrous convolution, and fully connected CRFs."
     by Chen et al. 2017.
     """
 
-    def __init__(self, in_channels: int, inter_channels: int = 1, out_channels: Optional[int] = None,
+    def __init__(self, in_channels: int, in_size: int, inter_channels: int = 1, out_channels: Optional[int] = None,
                  base_dilation: int = 4, num_dilation_layers: int = 3, up_mode: str = "bilinear"):
         super().__init__()
         if out_channels is None:
@@ -164,9 +166,9 @@ class ASPP(nn.Module):
 
         self.layers = nn.ModuleList([
             nn.Sequential(
-                nn.AvgPool2d(kernel_size=2),
+                nn.AvgPool2d(kernel_size=in_size),
                 ConvBNReLU(in_channels=in_channels, out_channels=inter_channels, kernel_size=1),
-                nn.Upsample(scale_factor=2, mode=up_mode)
+                nn.Upsample(scale_factor=in_size, mode=up_mode)
             ),
             ConvBNReLU(in_channels=in_channels, out_channels=inter_channels, kernel_size=1)
         ])
@@ -217,7 +219,8 @@ class Encoder(nn.Module):
 class DecodBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int, up_mode: str = "bilinear", skip_con: bool = True,
                  gate: bool = False, last_bn_relu: bool = True, num_conv: int = 2,
-                 inter_channels_equal_out_channels: bool = True, down_mode: Literal["max", "avg", "conv"] = "conv",
+                 inter_channels_equal_out_channels: bool = True,
+                 down_mode: Literal["max", "avg", "conv", "conv1x1"] = "conv",
                  min_inter_channels: Optional[int] = None):
         super().__init__()
         self.up = Up(in_channels=in_channels, mode=up_mode)
@@ -246,7 +249,8 @@ class DecodBlock(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, in_channels: int, out_channels: Optional[int] = None, depth: int = 3, gate: bool = False,
                  last_bn_relu: bool = True, num_conv_per_layer: int = 2,
-                 inter_channels_equal_out_channels: bool = True, down_mode: Literal["max", "avg", "conv"] = "conv",
+                 inter_channels_equal_out_channels: bool = True,
+                 down_mode: Literal["max", "avg", "conv", "conv1x1"] = "conv",
                  min_inter_channels: Optional[int] = None):
         super().__init__()
         self.decoder = nn.ModuleList()
