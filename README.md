@@ -13,3 +13,4 @@ The evaluation of the postprocessing methods is conducted using
 -	the ground truth representations as input to determine the upper performance limit of the postprocessing methods.
 -	a single and a dual decoder U-Net (Ronneberger *et al*. 2015) to establish a baseline performance.
 -	a REU-Net (Qin *et al*. 2022) as a state-of-the-art network.
+The MoNuSeg dataset (Kumar *et al*. 2017) is used for all experiments.
