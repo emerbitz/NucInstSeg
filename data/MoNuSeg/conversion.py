@@ -11,10 +11,10 @@ from torch import Tensor
 
 from data.MoNuSeg.utils import get_bbox, threshold, cuda_tensor_to_ndarray
 from postprocessing.baseline_postprocessing import baseline_postprocess
+from postprocessing.contour_postprocessing import contour_postprocess
 from postprocessing.exprmtl_postprocessing import exprmtl_postprocess
 from postprocessing.graham_postprocessing import graham_postprocess
 from postprocessing.naylor_postprocessing import naylor_postprocess
-from postprocessing.noname_postprocessing import noname_postprocess
 from postprocessing.yang_postprocessing import yang_postprocess
 
 
@@ -73,7 +73,7 @@ class NucleiInstances:
 
     @staticmethod
     def from_seg(seg: Tensor, cont: Optional[Tensor] = None, seg_params: Optional[dict] = None,
-                 mode: Literal["baseline", "noname", "yang"] = "noname") -> "NucleiInstances":
+                 mode: Literal["baseline", "contour", "yang"] = "contour") -> "NucleiInstances":
         """
         Extracts nuclei instances from the (nuclei) segmentation.
 
@@ -82,7 +82,7 @@ class NucleiInstances:
             The postprocessing pipeline does not split touching/overlapping nuclei and is intended to serve as a
             baseline for performance comparison with the other postprocessing pipelines (that are hopefully able to
             split touching/overlapping nuclei XD).
-        * Noname postprocessing pipeline:
+        * Contour-based postprocessing pipeline:
             Nuclei instances are extracted using the watershed algorithm. Markers for watershed segmentation
             are obtained by removing the nuclei contours from the whole nuclei.
         * Yang postprocessing pipeline:
@@ -105,10 +105,10 @@ class NucleiInstances:
 
         if mode == "baseline":
             labeled_inst = baseline_postprocess(seg_mask=seg_mask, baseline_params=seg_params)
-        elif mode == "noname":
+        elif mode == "contour":
             cont = cuda_tensor_to_ndarray(cont)
             cont_mask = threshold(cont, thresh=seg_params["thresh_cont"])
-            labeled_inst = noname_postprocess(seg_mask=seg_mask, cont_mask=cont_mask, noname_params=seg_params)
+            labeled_inst = contour_postprocess(seg_mask=seg_mask, cont_mask=cont_mask, noname_params=seg_params)
         elif mode == "yang":
             labeled_inst = yang_postprocess(seg_mask=seg_mask, yang_params=seg_params)
 
@@ -133,8 +133,14 @@ class NucleiInstances:
     def from_hv_map(hv_map: Tensor, seg: Tensor, hv_params: Optional[dict] = None,
                     exprmtl: bool = False) -> "NucleiInstances":
         """
-        Extracts nuclei instances from the horizontal and vertical distance map via the postprocessing strategy by
-         Graham et al. 2019.
+        Extracts nuclei instances from the horizontal and vertical distance map.
+
+        Two different postprocessing pipelines are available for nuclei instance extraction:
+        * Graham postprocessing pipeline:
+            The original postprocessing pipeline from the paper "Hover-Net: Simultaneous segmentation and
+            classification of nuclei in multi-tissue histology images" by Graham et al. 2019.
+        * Experimental postprocessing pipeline:
+            The postprocessing pipeline is derived from the Graham postprocessing pipeline.
         """
         default_params = {
             "thresh_seg": 0.5,
@@ -271,38 +277,3 @@ class NucleiInstances:
         else:
             raise ValueError(f"Order should be CHW or HWC. Got instead {order}")
 
-
-def setup():
-    from data.MoNuSeg.data_module import MoNuSegDataModule
-
-    data_module = MoNuSegDataModule(
-        seg_masks=True,
-        cont_masks=True,
-        dist_maps=True,
-        labels=False,
-        data_root="../../datasets"
-    )
-    data_module.setup(stage="test")
-    test_loader = data_module.test_dataloader()
-    img, seg_mask, cont_mask, dist_map, inst_gt = next(iter(test_loader))
-    inst = inst_gt[0].numpy()
-    return inst
-
-
-if __name__ == "__main__":
-    from data.MoNuSeg.illustrator import Picture
-
-    # res = timeit(setup="from data.MoNuSeg.ground_truth import NucleiInstances, setup; inst=setup()[0]",
-    #              stmt="NucleiInstances([inst]).to_hv_map()", number=int(1e5))
-    # print(res)
-
-    inst = setup()
-    hv_map = NucleiInstances([inst[0], inst[1]]).to_hv_map()
-    print(hv_map.shape)
-    Picture(hv_map[0]).show()
-    Picture(hv_map[1]).show()
-    Picture(inst[0]).show()
-    Picture(inst[1]).show()
-
-    # y_min, y_max, x_min, x_max = get_bbox(inst[0])
-    # Picture(inst[0][y_min:y_max, x_min:x_max]).show()
