@@ -6,6 +6,7 @@ Nuclei instance segmentation is a crucial task in biomedical image analysis. How
 -	The postprocessing method from “HoVer-Net: Simultaneous segmentation and classification of nuclei in multi-tissue histology images” by Graham et al. 2019
 -	A modified version of the postprocessing method from Graham et al. 2019
 
+
 The postprocessing methods are further compared with a baseline postprocessing method incapable of separating touching/overlapping nuclei to allow for a better performance evaluation of the postprocesing methods. 
 The evaluation of the postprocessing methods is conducted using 
 -	the ground truth representations as input to determine the upper performance limit of the postprocessing methods.
