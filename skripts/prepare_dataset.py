@@ -10,7 +10,14 @@ def prepare_data(data_split: str = "Train Kaggle", data_root: str = "datasets",
                  seg_masks: bool = True, cont_masks: bool = True, dist_maps: bool = True,
                  img_size: Union[Tuple[int, int], int] = (256, 256)
                  ):
-    # Create ground truths
+    """
+    Prepares the MoNuSeg dataset prior to usage.
+
+    First, the ground truth representations (i.e., the classification probability and distance maps) are generated from
+    the nuclei instances. Subsequently, image patches are extracted from each whole slide image (WSI) and its
+    corresponding ground truth.
+    """
+    # Create ground truth representations
     creator = MoNuSegCreator(root=data_root)
     creator.save_ground_truths(
         segmentation_masks=seg_masks,
@@ -41,6 +48,12 @@ def main():
         data_root="datasets"
     )
 
+
+"""
+This skript needs to be executed prior to the usage of the MoNuSeg dataset.
+
+The skript generates the required image patches of each whole slide image (WSI) and the corresponding ground truth.
+"""
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,8 @@
 import functools
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
-
+import matplotlib.pyplot as plt
+import cv2
 import numpy as np
 import pytorch_lightning as pl
 import torch
@@ -16,14 +17,21 @@ from models.losses import SegLoss, DistLoss, HVLoss
 from postprocessing.postprocesses import SegPostProcess, DistPostProcess, HVPostProcess
 
 
-class NetModel(pl.LightningModule):
+class NetModule(pl.LightningModule):
+    """
+    General neural network  containing the training, validation, and test loop.
 
-    def __init__(self, net, train_params: Optional[Dict] = None, pprocess_params: Optional[Dict] = None) -> None:
+    optimizer and learning rate scheduler
+    """
+
+    def __init__(self, net, train_params: Optional[Dict] = None, pprocess_params: Optional[Dict] = None,
+                 enable_val_metrics: bool = False) -> None:
         super().__init__()
         # # Use in combination with the detailed ModelSummary callback:
         # self.example_input_array = Tensor(8, 3, 256, 256)
         self.save_hyperparameters(ignore=["net"])
         self.net = net
+        self.enable_val_metrics = enable_val_metrics
 
         default_train_params = {
             "lr": 6e-4,
@@ -47,24 +55,25 @@ class NetModel(pl.LightningModule):
         double_main_task = getattr(net, "double_main_task", False)
         self.auxiliary_task = getattr(net, "auxiliary_task", True)
 
-        if self.mode in ["baseline", "noname", "yang"]:
+        if self.mode in ["baseline", "contour", "yang"]:
             self.loss_fn = SegLoss(double_main_task=double_main_task, auxiliary_task=self.auxiliary_task)
             self.postprocess_fn = SegPostProcess(seg_params=self.pprocess_params, mode=self.mode)
         elif self.mode == "naylor":
-            self.loss_fn = DistLoss(double_main_task=double_main_task, auxiliary_task=self.auxiliary_task)
+            naylor_aux_task = getattr(net, "naylor_aux_task", "cont_mask")
+            self.loss_fn = DistLoss(double_main_task=double_main_task, auxiliary_task=self.auxiliary_task,
+                                    aux_task_mode=naylor_aux_task)
             self.postprocess_fn = DistPostProcess(dist_params=self.pprocess_params)
         elif self.mode in ["exprmtl", "graham"]:
             self.loss_fn = HVLoss(double_main_task=double_main_task)
             # self.loss_fn = GrahamLoss(additional_loss_term=additional_loss_term)
             self.postprocess_fn = HVPostProcess(hv_params=self.pprocess_params, exprmtl=self.mode == "exprmtl")
         else:
-            raise ValueError(f"Mode should be 'baseline', 'noname', 'yang', 'naylor', 'graham' or 'exprmtl'. "
+            raise ValueError(f"Mode should be 'baseline', 'contour', 'yang', 'naylor', 'graham' or 'exprmtl'. "
                              f"Got instead {self.mode}.")
-        # self.performance_loss = PerformanceLoss(mode=self.mode)
 
         metrics = MetricCollection([
             DSC(),
-            AJI(),
+            # AJI(),
             ModAJI(),
             PQ()
         ], compute_groups=False)
@@ -123,8 +132,9 @@ class NetModel(pl.LightningModule):
 
         # No postprocessing for the first epochs
         if self.current_epoch >= self.train_params["start_pprocess_epoch"]:
-            pred["inst"] = self.postprocess_fn(pred)
-            self.val_metrics.update(pred["inst"], val_batch["inst"])
+            if self.enable_val_metrics:
+                pred["inst"] = self.postprocess_fn(pred)
+                self.val_metrics.update(pred["inst"], val_batch["inst"])
 
         self.log_on_epoch("step", torch.tensor(self.current_epoch, dtype=torch.float))
         self.log_on_epoch("val_loss", loss)
@@ -134,10 +144,11 @@ class NetModel(pl.LightningModule):
 
     def on_validation_epoch_end(self) -> None:
         # Catch UserWarning resulting from calling the 'compute' before the 'update' method
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", UserWarning)
-            self.log_dict(self.val_metrics.compute())
-        self.val_metrics.reset()
+        if self.enable_val_metrics:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                self.log_dict(self.val_metrics.compute())
+            self.val_metrics.reset()
 
     def test_step(self, test_batch, batch_idx):
         pred = self.forward(test_batch["img"])
@@ -152,6 +163,11 @@ class NetModel(pl.LightningModule):
         if batch_idx == 0:
             self.log_pred_and_gt(pred, test_batch, idx=4)
 
+        if "label" in test_batch.keys():
+            self.log_pred_and_gt_for_labels(pred, test_batch, labels=["TCGA-AY-A8YK-01A-01-TS1_256_3",
+                                                                      "TCGA-B0-5698-01Z-00-DX1_256_1",
+                                                                      "TCGA-21-5784-01Z-00-DX1_256_0"])
+
     def on_test_epoch_end(self) -> None:
         self.log_dict(self.test_metrics.compute())
         self.test_metrics.reset()
@@ -161,35 +177,65 @@ class NetModel(pl.LightningModule):
         """Returns the device of the model."""
         return self._device
 
+    def log_pred_and_gt_for_labels(self, pred: Dict[str, Union[Tensor, Tuple[Tensor, ...]]],
+                                   gt: Dict[str, Union[Tensor, Tuple[Tensor, ...]]], labels: List[str]):
+        for i, l in enumerate(gt["label"]):
+            if l in labels:
+                # print(f"Logging predictions and ground truths for label {l}.")
+                self.log_pred_and_gt(pred, gt, idx=i, name=l)
+
     def log_pred_and_gt(self, pred: Dict[str, Union[Tensor, Tuple[Tensor, ...]]],
-                        gt: Dict[str, Union[Tensor, Tuple[Tensor, ...]]], idx: int = 0):
-        self.log_pred(pred, idx=idx)
-        self.log_gt(gt, idx=idx)
+                        gt: Dict[str, Union[Tensor, Tuple[Tensor, ...]]], idx: int = 0, name: Optional[str] = None):
+        self.log_pred(pred, idx=idx, name=name)
+        self.log_gt(gt, idx=idx, name=name)
 
-    def log_gt(self, gt: Dict[str, Union[Tensor, Tuple[Tensor, ...]]], idx: int = 0):
-        for name, tensor in gt.items():
-            if name in ["img", "seg_mask", "cont_mask"]:
-                tag = name if name == "img" else f"{name}_gt"
+    def log_gt(self, gt: Dict[str, Union[Tensor, Tuple[Tensor, ...]]], idx: int = 0, name: Optional[str] = None):
+        for gt_type, tensor in gt.items():
+            if gt_type in ["img", "seg_mask", "cont_mask"]:
+                tag = gt_type if gt_type == "img" else f"{gt_type}_gt"
+                if name is not None:
+                    tag = f"{tag}_{name}"
                 self.log_image(tensor, tag=tag, idx=idx)
-            elif name == "dist_map":
-                self.log_map(tensor, tag=["dist_map_gt"], idx=idx)
-            elif name == "hv_map":
-                self.log_map(tensor, tag=["h_map_gt", "v_map_gt"], idx=idx)
-            elif name == "inst":
-                self.log_instances(tensor, tag="inst_gt", idx=idx)
+            elif gt_type == "dist_map":
+                tag = "dist_map_gt"
+                if name is not None:
+                    tag = f"{tag}_{name}"
+                self.log_map(tensor, tag=[tag], idx=idx)
+            elif gt_type == "hv_map":
+                if name is not None:
+                    self.log_map(tensor, tag=[f"h_map_gt_{name}", f"v_map_gt_{name}"], idx=idx)
+                else:
+                    self.log_map(tensor, tag=["h_map_gt", "v_map_gt"], idx=idx)
+            elif gt_type == "inst":
+                tag = "inst_gt"
+                if name is not None:
+                    tag = f"{tag}_{name}"
+                self.log_instances(tensor, tag=tag, idx=idx)
 
-    def log_pred(self, pred: Dict[str, Union[Tensor, Tuple[Tensor, ...]]], idx: int = 0):
-        for name, tensor in pred.items():
-            if name in ["seg_mask", "cont_mask"]:
-                thresh_key, thresh_default = ("thresh_seg", 0.5) if name == "seg_mask" else ("thresh_cont", 0.15)
+    def log_pred(self, pred: Dict[str, Union[Tensor, Tuple[Tensor, ...]]], idx: int = 0, name: Optional[str] = None):
+        for pred_type, tensor in pred.items():
+            if pred_type in ["seg_mask", "cont_mask"]:
+                thresh_key, thresh_default = ("thresh_seg", 0.5) if pred_type == "seg_mask" else ("thresh_cont", 0.15)
                 thresh = self.pprocess_params.get(thresh_key, thresh_default)
-                self.log_mask(tensor, tag=f"{name}_pred", thresh=thresh, idx=idx)
-            elif name == "dist_map":
-                self.log_map(tensor, tag=["dist_map_pred"], idx=idx)
-            elif name == "hv_map":
-                self.log_map(tensor, tag=["h_map_pred", "v_map_pred"], idx=idx)
-            elif name == "inst":
-                self.log_instances(tensor, tag="inst_pred", idx=idx)
+                tag = f"{pred_type}_pred"
+                if name is not None:
+                    tag = f"{tag}_{name}"
+                self.log_mask(tensor, tag=tag, thresh=thresh, idx=idx)
+            elif pred_type == "dist_map":
+                tag = "dist_map_pred"
+                if name is not None:
+                    tag = f"{tag}_{name}"
+                self.log_map(tensor, tag=[tag], idx=idx)
+            elif pred_type == "hv_map":
+                if name is not None:
+                    self.log_map(tensor, tag=[f"h_map_pred_{name}", f"v_map_pred_{name}"], idx=idx)
+                else:
+                    self.log_map(tensor, tag=["h_map_pred", "v_map_pred"], idx=idx)
+            elif pred_type == "inst":
+                tag = "inst_pred"
+                if name is not None:
+                    tag = f"{tag}_{name}"
+                self.log_instances(tensor, tag=tag, idx=idx)
 
     def log_instances(self, inst: Tuple[Tensor, ...], img: Optional[Tensor] = None, tag: str = "inst",
                       idx: int = 0):
@@ -219,6 +265,12 @@ class NetModel(pl.LightningModule):
     def log_map(self, img: Tensor, tag: List[str], idx: int = 0):
         for i, t in zip(img[idx], tag):
             i = Picture.tensor_to_ndarray(i)
+            if t[:8] == "dist_map":
+                i = cv2.normalize(i, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+            if t[:5] == "h_map" or t[:5] == "v_map":
+                i = cv2.normalize(i, None, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_32F)
+                cmap = plt.get_cmap("bwr")
+                i = cmap(i)
             self._log_img(img=i, tag=t)
 
     def log_image(self, img: Tensor, tag: str = "image", idx: int = 0):
