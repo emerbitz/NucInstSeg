@@ -9,9 +9,8 @@ from pytorch_lightning.profilers import SimpleProfiler  # Alternative: AdvancedP
 
 from data.MoNuSeg.data_module import MoNuSegDataModule
 from models.net_module import NetModule
-from models.u_net import UNet, UNetDualDecoder
 from models.reu_net import REUNet
-from models.al_net import ALNet
+from models.u_net import UNet, UNetDualDecoder
 
 
 def select_ckpt_path(project: str, name: str, base_dir: str = "trained_models") -> str:
@@ -154,19 +153,19 @@ if __name__ == "__main__":
 
     pl.seed_everything(42, workers=True)  # Seed for torch, numpy and python.random
     net = REUNet(mode="baseline", net_params=net_params)
-    name = "baseline_reunet_netchannels48_factor2_aspp96_depth4_normf_lr=reu200"
+    name = "baseline_reunet_netchannels48_factor2_aspp96_depth4_lr=reu200"
     train(net=net, project="reu_net", name=name, train_params=train_params, pprocess_params=None)
 
     pl.seed_everything(42, workers=True)  # Seed for torch, numpy and python.random
     net = REUNet(mode="naylor", naylor_aux_task="cont_mask", net_params=net_params)
-    name = "naylor_reunet_auxcont_netchannels48_factor2_aspp96_depth4_normf_lr=reu200"
+    name = "naylor_reunet_auxcont_netchannels48_factor2_aspp96_depth4_lr=reu200"
     train(net=net, project="reu_net", name=name, train_params=train_params, pprocess_params=None)
     pl.seed_everything(42, workers=True)  # Seed for torch, numpy and python.random
     net = REUNet(mode="naylor", naylor_aux_task="hv_map", net_params=net_params)
-    name = "naylor_reunet_auxhv_netchannels48_factor2_aspp96_depth4_normf_lr=reu200"
+    name = "naylor_reunet_auxhv_netchannels48_factor2_aspp96_depth4_lr=reu200"
     train(net=net, project="reu_net", name=name, train_params=train_params, pprocess_params=None)
 
     pl.seed_everything(42, workers=True)  # Seed for torch, numpy and python.random
     net = REUNet(mode="graham", net_params=net_params)
-    name = "graham_reunet_netchannels48_factor2_aspp96_depth4_normf_lr=reu200"
+    name = "graham_reunet_netchannels48_factor2_aspp96_depth4_lr=reu200"
     train(net=net, project="reu_net", name=name, train_params=train_params, pprocess_params=None)

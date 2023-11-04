@@ -45,7 +45,7 @@ def main():
         cont_masks=True,
         dist_maps=True,
         img_size=(256, 256),
-        data_root="datasets"
+        data_root="../datasets"
     )
 
 
