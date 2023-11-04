@@ -1,8 +1,9 @@
 import functools
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
-import matplotlib.pyplot as plt
+
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import pytorch_lightning as pl
 import torch
@@ -11,7 +12,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, CosineAnnealingWarmResta
 from torchmetrics import MetricCollection
 
 from data.MoNuSeg.illustrator import Picture
-from evaluation.metrics import DSC, AJI, ModAJI, PQ
+from evaluation.metrics import DSC, ModAJI, PQ
 from evaluation.utils import is_empty
 from models.losses import SegLoss, DistLoss, HVLoss
 from postprocessing.postprocesses import SegPostProcess, DistPostProcess, HVPostProcess
@@ -19,9 +20,12 @@ from postprocessing.postprocesses import SegPostProcess, DistPostProcess, HVPost
 
 class NetModule(pl.LightningModule):
     """
-    General neural network  containing the training, validation, and test loop.
+    General module for training, validating, and testing of neural networks.
 
-    optimizer and learning rate scheduler
+    The network module contains
+    * The training, validation, and test loop
+    * The logic for the optimizer and learning rate schedulers
+    * Auxiliary functions for the logging of network predictions.
     """
 
     def __init__(self, net, train_params: Optional[Dict] = None, pprocess_params: Optional[Dict] = None,
@@ -128,7 +132,6 @@ class NetModule(pl.LightningModule):
     def validation_step(self, val_batch, batch_idx):
         pred = self.forward(val_batch["img"])
         loss = self.loss_fn(pred, val_batch)
-        # performance = self.performance_loss(pred, val_batch)
 
         # No postprocessing for the first epochs
         if self.current_epoch >= self.train_params["start_pprocess_epoch"]:
@@ -138,7 +141,6 @@ class NetModule(pl.LightningModule):
 
         self.log_on_epoch("step", torch.tensor(self.current_epoch, dtype=torch.float))
         self.log_on_epoch("val_loss", loss)
-        # self.log_dict_on_epoch(performance)
 
         return loss
 
@@ -179,17 +181,19 @@ class NetModule(pl.LightningModule):
 
     def log_pred_and_gt_for_labels(self, pred: Dict[str, Union[Tensor, Tuple[Tensor, ...]]],
                                    gt: Dict[str, Union[Tensor, Tuple[Tensor, ...]]], labels: List[str]):
+        """Logs the network predictions and associated ground truth representations for the given labels."""
         for i, l in enumerate(gt["label"]):
             if l in labels:
-                # print(f"Logging predictions and ground truths for label {l}.")
                 self.log_pred_and_gt(pred, gt, idx=i, name=l)
 
     def log_pred_and_gt(self, pred: Dict[str, Union[Tensor, Tuple[Tensor, ...]]],
                         gt: Dict[str, Union[Tensor, Tuple[Tensor, ...]]], idx: int = 0, name: Optional[str] = None):
+        """Logs the network predictions and associated ground truth representations."""
         self.log_pred(pred, idx=idx, name=name)
         self.log_gt(gt, idx=idx, name=name)
 
     def log_gt(self, gt: Dict[str, Union[Tensor, Tuple[Tensor, ...]]], idx: int = 0, name: Optional[str] = None):
+        """Logs the ground truth representations."""
         for gt_type, tensor in gt.items():
             if gt_type in ["img", "seg_mask", "cont_mask"]:
                 tag = gt_type if gt_type == "img" else f"{gt_type}_gt"
@@ -213,6 +217,7 @@ class NetModule(pl.LightningModule):
                 self.log_instances(tensor, tag=tag, idx=idx)
 
     def log_pred(self, pred: Dict[str, Union[Tensor, Tuple[Tensor, ...]]], idx: int = 0, name: Optional[str] = None):
+        """Logs the network predictions."""
         for pred_type, tensor in pred.items():
             if pred_type in ["seg_mask", "cont_mask"]:
                 thresh_key, thresh_default = ("thresh_seg", 0.5) if pred_type == "seg_mask" else ("thresh_cont", 0.15)
@@ -263,6 +268,7 @@ class NetModule(pl.LightningModule):
         self._log_img(img, tag=tag)
 
     def log_map(self, img: Tensor, tag: List[str], idx: int = 0):
+        """Logs the distance maps."""
         for i, t in zip(img[idx], tag):
             i = Picture.tensor_to_ndarray(i)
             if t[:8] == "dist_map":
