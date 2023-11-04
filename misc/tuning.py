@@ -1,23 +1,13 @@
-from typing import Any, Dict, Optional, Tuple
-from pathlib import Path
 from collections import defaultdict
-import torch.nn as nn
-from torch import Tensor
-import optuna
-from optuna.pruners import MedianPruner
-from optuna.samplers import TPESampler, GridSampler
-from optuna.integration import PyTorchLightningPruningCallback
+
 import pytorch_lightning as pl
+from optuna.integration import PyTorchLightningPruningCallback
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from data.MoNuSeg.data_module import MoNuSegDataModule
-from models.net_module import NetModule
 from models.al_net import ALNet
-from models.att_net import AttentionUNet
-from models.al_net_light import ALNetLightDualDecoder
+from models.net_module import NetModule
 from models.reu_net import REUNet
-from models.u_net import UNet, UNetDualDecoder
-from evaluating import evaluate
 
 
 def suggest_train_params(trial):
@@ -97,3 +87,20 @@ def tune_net_params(trial):
                                                  batch_size=model.train_params["batch_size"])
     trainer.fit(model, data_module)
     return trainer.logged_metrics["val_loss"]
+
+
+if __name__ == '__main__':
+    pass
+    # study = optuna.create_study(direction="maximize")
+    # study.optimize(tune_pprocess_params, n_trials=100)
+    # # study = optuna.create_study(direction="minimize", pruner=MedianPruner())
+    # # study.optimize(tune_train_params, n_trials=100)
+    #
+    # print("Number of finished trials: ", len(study.trials))
+    # print("Best trial:")
+    # trial = study.best_trial
+    #
+    # print("Value: ", trial.value)
+    # print("Params: ")
+    # for key, value in trial.params.items():
+    #     print(f"    {key}: {value}")

@@ -1,23 +1,15 @@
-from typing import Any, Dict, Optional, Tuple
-from pathlib import Path
 from collections import defaultdict
-import torch.nn as nn
-from torch import Tensor
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
+
 import optuna
-from optuna.pruners import MedianPruner
-from optuna.samplers import TPESampler, GridSampler
-from optuna.integration import PyTorchLightningPruningCallback
 import pytorch_lightning as pl
+from optuna.samplers import TPESampler
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from data.MoNuSeg.data_module import MoNuSegDataModule
 from models.net_module import NetModule
-from models.al_net import ALNet
-from models.att_net import AttentionUNet
-from models.al_net_light import ALNetLightDualDecoder
 from models.reu_net import REUNet
-from models.u_net import UNet, UNetDualDecoder
-from evaluating import evaluate
 
 
 def suggest_thresh(trial, thresh_name: str, is_float: bool = True, range_float: Optional[Tuple[float, float]] = None):
@@ -89,7 +81,7 @@ class PostProcessParamsTuner:
         self.project = project
         self.ckpt_name = ckpt_name
         self.tune_from = tune_from
-        self.log_dir = Path("../lightning_logs", "tuning", "pprocess_params", f"{self.project}_{self.mode}")
+        self.log_dir = Path("lightning_logs", "tuning", "pprocess_params", f"{self.project}_{self.mode}")
         self.ckpt_file = self.get_ckpt_file()
         self.objective = objective
         self.direction = direction
@@ -128,11 +120,13 @@ class PostProcessParamsTuner:
 
     def get_ckpt_file(self) -> str:
         """Retrieves the name of the checkpoint (ckpt) file."""
-        ckpt_dir = Path("../trained_models", self.project, self.ckpt_name)
-        ckpt_file = ckpt_dir.rglob(f"*{self.tune_from}*.ckpt")
+        ckpt_dir = Path("trained_models", self.project, self.ckpt_name)
+        ckpt_file = ckpt_dir.glob(f"*{self.tune_from}*.ckpt")
         ckpt_file = list(ckpt_file)
         if len(ckpt_file) > 1:
-            raise ValueError(f"Found multiple checkpoint files: {ckpt_file}")
+            raise ValueError(f"Found multiple checkpoint files: {ckpt_file}.")
+        if not len(ckpt_file):
+            raise ValueError(f"Found no checkpoint file in the directory '{ckpt_dir}'.")
         return str(ckpt_file[0])
 
 
@@ -149,26 +143,26 @@ if __name__ == '__main__':
     }
     # Tuning of the baseline postprocessing method
     net = REUNet(mode="baseline", net_params=net_params)
-    name = "baseline_reunet_netchannels48_factor2_aspp96_depth4_normf_lr=reu200"
+    name = "baseline_reunet_netchannels48_factor2_aspp96_depth4_lr=reu200"
     project = "reu_net"
     pparams, ckpt_file = PostProcessParamsTuner(net=net, project=project, ckpt_name=name, n_trials=100)()
     # # Tuning of the Yang postprocessing method
     # net = REUNet(mode="yang", net_params=net_params)
-    # name = "baseline_reunet_netchannels48_factor2_aspp96_depth4_normf_lr=reu200"
+    # name = "baseline_reunet_netchannels48_factor2_aspp96_depth4_lr=reu200"
     # project = "reu_net"
     # pparams, ckpt_file = PostProcessParamsTuner(net=net, project=project, ckpt_name=name, n_trials=100)()
     # # Tuning of the contour-based postprocessing method
     # net = REUNet(mode="contour", net_params=net_params)
-    # name = "baseline_reunet_netchannels48_factor2_aspp96_depth4_normf_lr=reu200"
+    # name = "baseline_reunet_netchannels48_factor2_aspp96_depth4_lr=reu200"
     # project = "reu_net"
     # pparams, ckpt_file = PostProcessParamsTuner(net=net, project=project, ckpt_name=name, n_trials=100)()
     # # Tuning of the Graham postprocessing method
     # net = REUNet(mode="graham", net_params=net_params)
-    # name = "graham_reunet_netchannels48_factor2_aspp96_depth4_normf_lr=reu200"
+    # name = "graham_reunet_netchannels48_factor2_aspp96_depth4_lr=reu200"
     # project = "reu_net"
     # pparams, ckpt_file = PostProcessParamsTuner(net=net, project=project, ckpt_name=name, n_trials=100)()
     # # Tuning of the Graham derived postprocessing method
     # net = REUNet(mode="exprmtl", net_params=net_params)
-    # name = "graham_reunet_netchannels48_factor2_aspp96_depth4_normf_lr=reu200"
+    # name = "graham_reunet_netchannels48_factor2_aspp96_depth4_lr=reu200"
     # project = "reu_net"
     # pparams, ckpt_file = PostProcessParamsTuner(net=net, project=project, ckpt_name=name, n_trials=100)()
