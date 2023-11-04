@@ -6,7 +6,7 @@ import numpy as np
 from skimage.color import label2rgb
 from torch import Tensor
 
-from data.MoNuSeg.ground_truth import NucleiInstances
+from data.MoNuSeg.conversion import NucleiInstances
 from data.MoNuSeg.utils import cuda_tensor_to_ndarray, threshold
 
 

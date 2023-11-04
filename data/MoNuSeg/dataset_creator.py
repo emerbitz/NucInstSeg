@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 from tqdm import tqdm
 
-from data.MoNuSeg.ground_truth import NucleiInstances
+from data.MoNuSeg.conversion import NucleiInstances
 from data.MoNuSeg.utils import comp_dirs
 
 

@@ -17,7 +17,7 @@ class MoNuSegDataModule(pl.LightningDataModule):
 
     @classmethod
     def default_mode(cls, mode: str, auxiliary_task: bool = True, **kwargs) -> "MoNuSegDataModule":
-        if mode == "noname":
+        if mode == "contour":
             return cls(seg_masks=True, cont_masks=True, dist_maps=False, hv_maps=False, **kwargs)
         elif mode in ["baseline", "yang"]:
             return cls(seg_masks=True, cont_masks=auxiliary_task, dist_maps=False, hv_maps=False, **kwargs)

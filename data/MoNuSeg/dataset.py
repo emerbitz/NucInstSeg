@@ -7,7 +7,7 @@ from PIL import Image
 from torch import Tensor
 from torch.utils.data import Dataset
 
-from data.MoNuSeg.ground_truth import NucleiInstances
+from data.MoNuSeg.conversion import NucleiInstances
 
 
 class MoNuSeg(Dataset):
