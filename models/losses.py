@@ -1,52 +1,9 @@
-from typing import Dict, Tuple, Union
+from typing import Dict, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
-
-
-class AdaptiveLoss:
-    def __init__(self, double_main_task: bool = False, auxiliary_task: bool = True):
-        self.bce = nn.BCEWithLogitsLoss()
-        self.mse = nn.MSELoss()
-
-    def __call__(self, pred: Dict[str, Tensor], gt: Dict[str, Union[str, Tensor]]) -> Tensor:
-        loss = torch.tensor(0., requires_grad=True)
-        for name in pred.keys():
-            name = name.replace("aux_", "")
-            if name in ["seg_mask", "cont_mask"]:
-                loss += self.bce(pred[name], gt[name])
-            elif name in ["dist_map", "hv_map"]:
-                loss += self.mse(pred[name], gt[name])
-        return loss
-
-
-# class PerformanceLoss:
-#     def __init__(self, mode: str):
-#         self.bce = nn.BCEWithLogitsLoss()
-#         self.mse = nn.MSELoss()
-#         self.mse_with_logits = MSEWithLogitsLoss()
-#         self.mode = mode
-#
-#     def __call__(self, pred: Dict[str, Tensor], gt: Dict[str, Union[str, Tensor]]) -> Dict[str, Tensor]:
-#         if self.mode in ["baseline", "yang", "noname"]:
-#             basic = self.bce(pred["seg_mask"], gt["seg_mask"])
-#             return {
-#                 "basic_performance": basic,
-#                 "advanced_performance": basic + self.bce(pred["cont_mask"], gt["cont_mask"])
-#             }
-#         elif self.mode == "naylor":
-#             return {
-#                 "basic_performance": self.mse(pred["dist_map"], gt["dist_map"]),
-#             }
-#         else:
-#             return {
-#                 "basic_performance": self.mse(pred["seg_mask"], gt["seg_mask"]) +
-#                                      self.mse(pred["hv_map"], gt["hv_map"]),
-#                 "advanced_performance": self.mse_with_logits(pred["seg_mask"], gt["seg_mask"]) +
-#                                         self.mse_with_logits(pred["hv_map"], (gt["hv_map"] + 1) / 2)
-#             }
 
 
 class SegLoss:
@@ -71,23 +28,34 @@ class SegLoss:
 
 
 class DistLoss:
-    def __init__(self, double_main_task: bool = False, auxiliary_task: bool = True):
+    def __init__(self, double_main_task: bool = False, auxiliary_task: bool = True,
+                 aux_task_mode: Optional[str] = "cont_mask"):
         self.double_main_task = double_main_task
         self.auxiliary_task = auxiliary_task
+        self.aux_task_mode = aux_task_mode
         self.mse = nn.MSELoss()
         self.bce = nn.BCEWithLogitsLoss()
 
     def __call__(self, pred: Dict[str, Tensor], gt: Dict[str, Union[str, Tensor]]) -> Tensor:
         if self.double_main_task and self.auxiliary_task:
-            return 2 * self.mse(pred["dist_map"], gt["dist_map"]) + \
-                   self.mse(pred["aux_dist_map"], gt["dist_map"]) + \
-                   self.bce(pred["cont_mask"], gt["cont_mask"])
+            if self.aux_task_mode == "hv_map":
+                return 2 * self.mse(pred["dist_map"], gt["dist_map"]) + \
+                    self.mse(pred["aux_dist_map"], gt["dist_map"]) + \
+                    self.mse(pred["hv_map"], gt["hv_map"])
+            else:
+                return 2 * self.mse(pred["dist_map"], gt["dist_map"]) + \
+                    self.mse(pred["aux_dist_map"], gt["dist_map"]) + \
+                    self.bce(pred["cont_mask"], gt["cont_mask"])
         elif self.double_main_task and not self.auxiliary_task:
             return 2 * self.mse(pred["dist_map"], gt["dist_map"]) + \
                    self.mse(pred["aux_dist_map"], gt["dist_map"])
         elif not self.double_main_task and self.auxiliary_task:
-            return self.mse(pred["dist_map"], gt["dist_map"]) + \
-                   self.bce(pred["cont_mask"], gt["cont_mask"])
+            if self.aux_task_mode == "hv_map":
+                return self.mse(pred["dist_map"], gt["dist_map"]) + \
+                    self.mse(pred["hv_map"], gt["hv_map"])
+            else:
+                return self.mse(pred["dist_map"], gt["dist_map"]) + \
+                    self.bce(pred["cont_mask"], gt["cont_mask"])
         else:
             return self.mse(pred["dist_map"], gt["dist_map"])
 
